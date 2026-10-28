@@ -1,0 +1,14 @@
+{
+  "name": "self-interpreting-bible",
+  "version": "1.0.0",
+  "description": "Web edition of John Brown of Haddington's Self-Interpreting Bible, transcribed from the scanned volumes",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node serve.mjs",
+    "check": "node tools/kjvcheck.mjs transcription/genesis/*.md"
+  },
+  "dependencies": {
+    "marked": "^12.0.2"
+  },
+  "private": true
+}
