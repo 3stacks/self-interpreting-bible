@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const kjv = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/kjv-src.json'), 'utf8').replace(/^﻿/, ''));
-// transcription/<book>/ picks the KJV book. Loose pdfNNN.md files stay on Genesis.
-const BOOK_AT = { genesis: 0, exodus: 1, leviticus: 2, numbers: 3, deuteronomy: 4, joshua: 5 };
+// transcription/<book>/ picks the KJV book: the folder is the book name in lower case with
+// hyphens ("1-samuel", "song-of-solomon"). Loose pdfNNN.md files stay on Genesis.
+const BOOK_AT = Object.fromEntries(kjv.map((b, i) => [b.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), i]));
 const chaptersFor = (file) => {
   const m = file.replace(/\\/g, '/').match(/transcription\/([a-z0-9-]+)\//);
   return kjv[BOOK_AT[m?.[1]] ?? 0].chapters;

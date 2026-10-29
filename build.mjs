@@ -16,6 +16,10 @@ import { annotateMeasures, CONVERSION_NOTE } from './lib/measures.mjs';
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const OUT = path.join(ROOT, 'build');
 const VOLUME = { n: 1, roman: 'I', pdfToPrinted: (p) => p - 3 };
+const ROMAN = ['', 'I', 'II', 'III', 'IV'];
+// Volume I scans live in scans/, later volumes in scans/vN/, so PDF page numbers never collide.
+const scanDir = (vol) => (vol > 1 ? `scans/v${vol}` : 'scans');
+const pad3 = (n) => String(n).padStart(3, '0');
 
 fs.mkdirSync(path.join(OUT, 'kjv'), { recursive: true });
 fs.mkdirSync(path.join(OUT, 'scans'), { recursive: true });
@@ -94,9 +98,9 @@ for (const meta of ANNOTATED) {
   const parsed = parseBook(dir);
   if (!parsed.pages.length) continue;
   const chapters = [...parsed.chapters.keys()].filter((n) => parsed.chapters.get(n).verses.size).sort((a, b) => a - b);
-  books.push({ meta, parsed, chapters });
+  books.push({ meta, parsed, chapters, vol: meta.volume ?? 1 });
 }
-const printedOf = (book, pdf) => book.parsed.printed[pdf] ?? VOLUME.pdfToPrinted(pdf);
+const printedOf = (book, pdf) => book.parsed.printed[pdf] ?? (book.vol === 1 ? VOLUME.pdfToPrinted(pdf) : '?');
 
 // ImageMagick's `convert` is not on every machine. Python/Pillow does the same rotates.
 function hasConvert() {
@@ -146,21 +150,23 @@ else:
 }
 
 // ---------- Scans (stored upside down in the PDF; turn them upright for the web) ----------
-const scanPages = new Set([...sections.values()].flatMap((s) => s.pages));
-for (const book of books) for (const pdf of book.parsed.pages) scanPages.add(pdf);
-for (const pdf of scanPages) {
-  const src = path.join(ROOT, 'scans', `pdf${String(pdf).padStart(3, '0')}.png`);
-  const dst = path.join(OUT, 'scans', `pdf${String(pdf).padStart(3, '0')}.png`);
+const scanPages = new Set([...sections.values()].flatMap((s) => s.pages).map((pdf) => `1:${pdf}`));
+for (const book of books) for (const pdf of book.parsed.pages) scanPages.add(`${book.vol}:${pdf}`);
+for (const key of scanPages) {
+  const [vol, pdf] = key.split(':').map(Number);
+  const src = path.join(ROOT, scanDir(vol), `pdf${pad3(pdf)}.png`);
+  const dst = path.join(OUT, scanDir(vol), `pdf${pad3(pdf)}.png`);
   if (fs.existsSync(src) && !fs.existsSync(dst)) convertImage(src, dst, { rotate: 180 });
 }
 // Most plates are printed sideways with the caption up the right edge; turn those upright.
 const UPRIGHT_PLATES = new Set([253, 255]);
 for (const book of books) {
   for (const { pdf } of book.parsed.plates) {
-    const src = path.join(OUT, 'scans', `pdf${pdf}.png`);
-    const thumb = path.join(OUT, 'scans', `thumb-pdf${pdf}.jpg`);
-    const big = path.join(OUT, 'scans', `plate-pdf${pdf}.jpg`);
-    const rotate = UPRIGHT_PLATES.has(pdf) ? 0 : 90;
+    const dir = path.join(OUT, scanDir(book.vol));
+    const src = path.join(dir, `pdf${pad3(pdf)}.png`);
+    const thumb = path.join(dir, `thumb-pdf${pdf}.jpg`);
+    const big = path.join(dir, `plate-pdf${pdf}.jpg`);
+    const rotate = book.vol === 1 && UPRIGHT_PLATES.has(pdf) ? 0 : 90;
     if (!fs.existsSync(thumb)) convertImage(src, thumb, { rotate, trim: true, resize: '1000x', quality: 78 });
     if (!fs.existsSync(big)) convertImage(src, big, { rotate, trim: true, resize: '2400x', quality: 82 });
   }
@@ -393,14 +399,18 @@ function chapterCells(book, activeChapter) {
 }
 
 function annotatedToc(activeSlug, activeChapter) {
-  const vol1 = books.map((book) => {
-    const onBook = book.meta.slug === activeSlug;
-    return `<div class="toc-part"><p class="toc-head"><a href="${book.meta.slug}.html"${onBook && activeChapter === 0 ? ' aria-current="page"' : ''}>${book.meta.name}</a></p><div class="ch-grid">${chapterCells(book, onBook ? activeChapter : 0)}</div></div>`;
-  }).join('\n');
-  return `<div class="toc-part"><p class="toc-head">Volume I</p></div>
-${vol1}
-<div class="toc-part"><p class="toc-head"><a href="index.html#before-genesis">Before Genesis</a></p></div>
-<div class="toc-part"><p class="toc-head"><a href="index.html#volume-2">Volumes II to IV</a></p></div>`;
+  const vols = [...new Set(books.map((b) => b.vol))].sort();
+  const parts = vols.map((v) => {
+    const list = books.filter((b) => b.vol === v).map((book) => {
+      const onBook = book.meta.slug === activeSlug;
+      return `<div class="toc-part"><p class="toc-head"><a href="${book.meta.slug}.html"${onBook && activeChapter === 0 ? ' aria-current="page"' : ''}>${book.meta.name}</a></p><div class="ch-grid">${chapterCells(book, onBook ? activeChapter : 0)}</div></div>`;
+    }).join('\n');
+    const aids = v === 1 ? '\n<div class="toc-part"><p class="toc-head"><a href="index.html#before-genesis">Before Genesis</a></p></div>' : '';
+    return `<div class="toc-part"><p class="toc-head">Volume ${ROMAN[v]}</p></div>\n${list}${aids}`;
+  });
+  const next = Math.max(...vols) + 1;
+  if (next <= 4) parts.push(`<div class="toc-part"><p class="toc-head"><a href="index.html#volume-${next}">${next < 4 ? `Volumes ${ROMAN[next]} to IV` : 'Volume IV'}</a></p></div>`);
+  return parts.join('\n');
 }
 
 function marginDate(d) {
@@ -475,15 +485,15 @@ function renderAnnotatedChapter(book, n) {
     let marker = '';
     if (vs.pdf && !pdfSeen.has(vs.pdf)) {
       pdfSeen.add(vs.pdf);
-      const label = `Vol. ${VOLUME.roman}, p. ${printedOf(book, vs.pdf)}`;
-      marker = `<div class="page-marker"><span>${label}</span><button type="button" class="scan-btn" data-scan="scans/pdf${vs.pdf}.png" data-label="${label}">View page scan</button></div>`;
+      const label = `Vol. ${ROMAN[book.vol]}, p. ${printedOf(book, vs.pdf)}`;
+      marker = `<div class="page-marker"><span>${label}</span><button type="button" class="scan-btn" data-scan="${scanDir(book.vol)}/pdf${pad3(vs.pdf)}.png" data-label="${label}">View page scan</button></div>`;
     }
     const plates = book.parsed.plates.filter((pl) => pl.after?.c === n && pl.after?.v === vs.v).map((pl) => {
       // "TITLE. [Genesis, xiii:3.]—Description…": set the title apart from the description.
       const cut = pl.caption.search(/\]\s*[—.-]*/);
       const title = cut > 0 ? pl.caption.slice(0, pl.caption.indexOf(']', cut) + 1) : pl.caption.split(/(?<=\.)\s/)[0];
       const rest = pl.caption.slice(title.length).replace(/^[\s—.-]+/, '');
-      return `<figure class="plate"><button type="button" class="scan-btn plate-btn" data-scan="scans/plate-pdf${pl.pdf}.jpg" data-label="${escapeHtml(title)}" aria-label="Enlarge: ${escapeHtml(title)}"><img src="scans/thumb-pdf${pl.pdf}.jpg" alt="${escapeHtml(title)}" loading="lazy"></button><figcaption><b>${escapeHtml(title)}</b>${rest ? ` ${escapeHtml(rest)}` : ''}</figcaption></figure>`;
+      return `<figure class="plate"><button type="button" class="scan-btn plate-btn" data-scan="${scanDir(book.vol)}/plate-pdf${pl.pdf}.jpg" data-label="${escapeHtml(title)}" aria-label="Enlarge: ${escapeHtml(title)}"><img src="${scanDir(book.vol)}/thumb-pdf${pl.pdf}.jpg" alt="${escapeHtml(title)}" loading="lazy"></button><figcaption><b>${escapeHtml(title)}</b>${rest ? ` ${escapeHtml(rest)}` : ''}</figcaption></figure>`;
     }).join('');
     return `${marker}<div class="verse" id="${vid}"${srcAttr(vs.src)}><p class="vt">${num} ${annotateMeasures(text)}</p>${margin ? `<div class="vm">${margin}</div>` : ''}</div>${plates}`;
   });
@@ -497,7 +507,7 @@ function renderAnnotatedChapter(book, n) {
 <article class="section chapter" data-slug="${slug}" data-code="${book.meta.code}" data-chapter="${n}">
   <p class="eyebrow">${book.meta.eyebrow}</p>
   <h1>${book.meta.name} ${n}</h1>
-  <p class="source">Chapter ${toRoman(n)} · Vol. ${VOLUME.roman}, ${printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : `p. ${printed[0]}`}</p>
+  <p class="source">Chapter ${toRoman(n)} · Vol. ${ROMAN[book.vol]}, ${printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : `p. ${printed[0]}`}</p>
   ${ch.summary ? `<p class="summary"${srcAttr(ch.summary.src)}>${linker.linkHtml(inline(ch.summary.text))}</p>` : ''}
   <div class="chapter-tools"><label><input type="checkbox" id="show-margin" checked> Margin references</label>${hasConv ? '<label><input type="checkbox" id="show-conv" checked> Modern measures</label>' : ''}${ch.notes.length ? `<a href="#notes">Notes ↓</a>` : ''}</div>
   <div class="scripture">${verses.join('\n')}</div>
@@ -517,9 +527,9 @@ for (const book of books) {
   extraTitles[book.meta.slug] = book.meta.name;
   const introBody = `
 <article class="section">
-  <p class="eyebrow">Volume ${VOLUME.roman}</p>
+  <p class="eyebrow">Volume ${ROMAN[book.vol]}</p>
   <h1>${escapeHtml(book.parsed.title || book.meta.name)}</h1>
-  <p class="source">With John Brown’s marginal references, notes and reflections · Vol. ${VOLUME.roman}, p. ${printedOf(book, book.parsed.pages[0])}</p>
+  <p class="source">With John Brown’s marginal references, notes and reflections · Vol. ${ROMAN[book.vol]}, p. ${printedOf(book, book.parsed.pages[0])}</p>
   ${book.parsed.intro.map((p) => `<p${srcAttr(p.src)}>${linker.linkHtml(inline(p.text))}</p>`).join('\n')}
   <h2>Chapters</h2>
   <div class="ch-grid big">${chapterCells(book, 0)}</div>
@@ -558,8 +568,9 @@ function aidLists(p) {
 }
 
 function volumeBlock(vol) {
-  const grids = vol.roman === 'I'
-    ? books.map((book) => `<section class="book-block">
+  const volN = ROMAN.indexOf(vol.roman);
+  const grids = books.some((b) => b.vol === volN)
+    ? books.filter((b) => b.vol === volN).map((book) => `<section class="book-block">
     <h4><a href="${book.meta.slug}.html">${book.meta.name}</a></h4>
     <div class="ch-grid big">${chapterCells(book, 0)}</div>
   </section>`).join('\n')
@@ -579,7 +590,7 @@ ${parts.map(aidLists).join('\n')}
     : '';
   const absent = vol.books.some((b) => !(b.slug && books.some((book) => book.meta.slug === b.slug)));
   const note = absent
-    ? `<p class="volume-note">${vol.roman === 'I'
+    ? `<p class="volume-note">${books.some((b) => b.vol === volN)
       ? 'If a name has no link, the site does not have that book yet.'
       : 'The site does not have this volume yet.'}</p>`
     : '';
