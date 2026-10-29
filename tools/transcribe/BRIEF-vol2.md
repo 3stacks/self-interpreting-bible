@@ -26,6 +26,8 @@ with commentary) into Markdown. Your prompt names the book, its folder, its KJV 
 - **Concluding remarks.** Many books end with a section "CONCLUDING REMARKS ON THE BOOK OF …". Put it in the notes block, after
   the last chapter's notes: a heading line `## Concluding Remarks on the Book of Judges.` (Title Case, as printed), then its
   paragraphs. Then `<!-- end of book -->` at the end of the book.
+- **Footnotes in the notes.** A small footnote at the foot of the notes, keyed by a superscript in a notes paragraph: write the key
+  as `{1}` where it sits in that paragraph, and the footnote as its own paragraph starting `{1} ` right after it.
 - Conventions (follow the Volume I files): keys `{a}` / `{1}`; a margin entry continued from the previous page is `?:? | …`
   at the top of the margin block; margin references compact (`Nu.21.21-35`), references in the notes spaced as printed;
   straight apostrophes (`'`); a chapter whose notes are only reflections gets `## Chapter X.` then `**Reflections.**—…`.
