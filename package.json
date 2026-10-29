@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node build.mjs",
     "serve": "node serve.mjs",
-    "check": "node tools/kjvcheck.mjs transcription/genesis/*.md transcription/exodus/*.md transcription/leviticus/*.md transcription/numbers/*.md transcription/deuteronomy/*.md"
+    "check": "node tools/kjvcheck.mjs transcription/genesis/*.md transcription/exodus/*.md transcription/leviticus/*.md transcription/numbers/*.md transcription/deuteronomy/*.md transcription/joshua/*.md"
   },
   "dependencies": {
     "marked": "^12.0.2"
