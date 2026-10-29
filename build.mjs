@@ -439,7 +439,8 @@ function renderAnnotatedChapter(book, n) {
   // Notes first, so verse numbers know which verses have a note.
   const noted = new Map(); // verse → note id
   const notes = ch.notes.map((note, i) => {
-    let html = linker.linkHtml(inline(note.text));
+    // A footnote in Brown's notes is keyed "{1}" in the note and again at the start of its own paragraph.
+    let html = linker.linkHtml(inline(note.text)).replace(/\{([0-9*†‡§]{1,2})\}/g, '<sup class="fn">$1</sup>');
     const id = `n${n}-${i + 1}`;
     const ver = note.text.match(/^\[?Ver\.\s*(\d+)/);
     if (ver) {
