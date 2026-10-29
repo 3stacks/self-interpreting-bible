@@ -195,6 +195,15 @@
     apply();
   }
 
+  // ---------- Annotated chapters: modern measures on/off ----------
+  const convBox = $('#show-conv');
+  if (convBox) {
+    const apply = () => { document.body.classList.toggle('no-conv', !convBox.checked); store.set('sib:conv', convBox.checked ? '1' : '0'); };
+    if (store.get('sib:conv') === '0') convBox.checked = false;
+    convBox.addEventListener('change', apply);
+    apply();
+  }
+
   // ---------- Search ----------
   if (document.body.classList.contains('search')) {
     const input = $('#q'), list = $('#search-results'), count = $('#search-count');

@@ -20,6 +20,10 @@ section, and a KJV popover on every scripture reference.
 - The control reads the column headings "Before Christ", "Year of the World", and "Year". A new table must use one of those headings.
 - The Bible link opens a transcribed chapter with Brown's notes. When that chapter is on the site, a scripture reference opens that chapter. Any other chapter opens as the King James text.
 - `data/kjv-src.json`: KJV text (thiagobodruk/bible, public domain).
+- `lib/measures.mjs` adds modern equivalents after biblical measures, for example "two cubits and a half [≈ 1.1 m · 3 ft 9 in]".
+  The build adds them. The transcription does not change. Each equivalent is in square brackets and has a label that says it is not in the printed text.
+  A sum "of silver" or "of gold" also gets a money value. That value uses the metal prices in `PRICES`. To update the money values, change `PRICES` and its date.
+  A reader can turn the equivalents off with "Modern measures" on each chapter page.
 
 ## Annotated books (Genesis onward)
 

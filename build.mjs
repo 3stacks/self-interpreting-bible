@@ -11,6 +11,7 @@ import { VOLUMES } from './lib/volumes.mjs';
 import { renderGenealogyChart } from './lib/genealogy.mjs';
 import { parseBook, toRoman } from './lib/genesis.mjs';
 import { ANNOTATED } from './lib/annotated.mjs';
+import { annotateMeasures, CONVERSION_NOTE } from './lib/measures.mjs';
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const OUT = path.join(ROOT, 'build');
@@ -437,7 +438,7 @@ function renderAnnotatedChapter(book, n) {
     }
     const refl = /^\*\*Reflections\.\*\*/.test(note.text);
     record(id, html, note.src);
-    return `<p id="${id}"${refl ? ' class="reflections"' : ''}${srcAttr(note.src)}>${html}</p>`;
+    return `<p id="${id}"${refl ? ' class="reflections"' : ''}${srcAttr(note.src)}>${annotateMeasures(html)}</p>`;
   });
 
   let pdfSeen = new Set();
@@ -484,23 +485,25 @@ function renderAnnotatedChapter(book, n) {
       const rest = pl.caption.slice(title.length).replace(/^[\s—.-]+/, '');
       return `<figure class="plate"><button type="button" class="scan-btn plate-btn" data-scan="scans/plate-pdf${pl.pdf}.jpg" data-label="${escapeHtml(title)}" aria-label="Enlarge: ${escapeHtml(title)}"><img src="scans/thumb-pdf${pl.pdf}.jpg" alt="${escapeHtml(title)}" loading="lazy"></button><figcaption><b>${escapeHtml(title)}</b>${rest ? ` ${escapeHtml(rest)}` : ''}</figcaption></figure>`;
     }).join('');
-    return `${marker}<div class="verse" id="${vid}"${srcAttr(vs.src)}><p class="vt">${num} ${text}</p>${margin ? `<div class="vm">${margin}</div>` : ''}</div>${plates}`;
+    return `${marker}<div class="verse" id="${vid}"${srcAttr(vs.src)}><p class="vt">${num} ${annotateMeasures(text)}</p>${margin ? `<div class="vm">${margin}</div>` : ''}</div>${plates}`;
   });
   const loose = ch.margin.map((e) => `${e.date ? marginDate(e.date) : ''}<p class="ment"${srcAttr(e.src)}><b>${escapeHtml(e.key)}</b> ${linker.linkHtml(inline(e.text))}${e.v ? ` <span class="muted">(ver. ${e.v})</span>` : ''}</p>`).join('');
 
   const i = book.chapters.indexOf(n);
   const prev = book.chapters[i - 1], next = book.chapters[i + 1];
   const printed = ch.pages.map((pdf) => printedOf(book, pdf));
+  const hasConv = verses.some((v) => v.includes('class="conv"')) || notes.some((p) => p.includes('class="conv"'));
   const body = `
 <article class="section chapter" data-slug="${slug}" data-code="${book.meta.code}" data-chapter="${n}">
   <p class="eyebrow">${book.meta.eyebrow}</p>
   <h1>${book.meta.name} ${n}</h1>
   <p class="source">Chapter ${toRoman(n)} · Vol. ${VOLUME.roman}, ${printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : `p. ${printed[0]}`}</p>
   ${ch.summary ? `<p class="summary"${srcAttr(ch.summary.src)}>${linker.linkHtml(inline(ch.summary.text))}</p>` : ''}
-  <div class="chapter-tools"><label><input type="checkbox" id="show-margin" checked> Margin references</label>${ch.notes.length ? `<a href="#notes">Notes ↓</a>` : ''}</div>
+  <div class="chapter-tools"><label><input type="checkbox" id="show-margin" checked> Margin references</label>${hasConv ? '<label><input type="checkbox" id="show-conv" checked> Modern measures</label>' : ''}${ch.notes.length ? `<a href="#notes">Notes ↓</a>` : ''}</div>
   <div class="scripture">${verses.join('\n')}</div>
   ${loose ? `<aside class="loose-margin"><h2>Other margin entries</h2>${loose}</aside>` : ''}
   ${ch.notes.length ? `<section class="notes" id="notes"><h2>Notes</h2>${notes.join('\n')}</section>` : ''}
+  ${hasConv ? `<p class="conv-note">${CONVERSION_NOTE}</p>` : ''}
   <nav class="pager" aria-label="Previous and next">
     ${prev ? `<a class="prev" href="${book.meta.slug}-${prev}.html"><span>Previous</span>${book.meta.name} ${prev}</a>` : `<a class="prev" href="${book.meta.slug}.html"><span>Previous</span>Introduction</a>`}
     ${next ? `<a class="next" href="${book.meta.slug}-${next}.html"><span>Next</span>${book.meta.name} ${next}</a>` : '<span></span>'}

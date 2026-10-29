@@ -333,3 +333,8 @@ a.ref:hover { text-decoration-style: solid; }
 .diff del { background: color-mix(in srgb, var(--rubric) 14%, transparent); text-decoration: line-through; white-space: pre-wrap; }
 .diff ins { background: color-mix(in srgb, var(--accent) 14%, transparent); text-decoration: none; white-space: pre-wrap; }
 .scan-viewer { z-index: 20; }
+
+/* Modern equivalents for measures: editorial, so set apart from the printed text. */
+.conv { font-family: var(--f-ui); font-size: 0.78em; font-style: normal; font-weight: 400; color: var(--muted); margin-left: 0.25em; border-bottom: 1px dotted var(--muted); cursor: help; }
+.no-conv .conv, .no-conv .conv-note { display: none; }
+.conv-note { font-family: var(--f-ui); font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 0.75rem; margin-top: 2rem; }
