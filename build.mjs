@@ -423,7 +423,8 @@ function renderAnnotatedChapter(book, n) {
   const ch = book.parsed.chapters.get(n);
   const slug = `${book.meta.slug}-${n}`;
   currentSlug = slug;
-  const title = `${book.meta.name} ${n}`;
+  const chName = book.meta.chapterName ?? book.meta.name; // "Psalm 23", not "Psalms 23"
+  const title = `${chName} ${n}`;
   extraTitles[slug] = title;
   const record = (id, html, src) => {
     const text = stripTags(html);
@@ -506,8 +507,8 @@ function renderAnnotatedChapter(book, n) {
   const body = `
 <article class="section chapter" data-slug="${slug}" data-code="${book.meta.code}" data-chapter="${n}">
   <p class="eyebrow">${book.meta.eyebrow}</p>
-  <h1>${book.meta.name} ${n}</h1>
-  <p class="source">Chapter ${toRoman(n)} · Vol. ${ROMAN[book.vol]}, ${printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : `p. ${printed[0]}`}</p>
+  <h1>${chName} ${n}</h1>
+  <p class="source">${book.meta.chapterName ?? 'Chapter'} ${toRoman(n)} · Vol. ${ROMAN[book.vol]}, ${printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : `p. ${printed[0]}`}</p>
   ${ch.summary ? `<p class="summary"${srcAttr(ch.summary.src)}>${linker.linkHtml(inline(ch.summary.text))}</p>` : ''}
   <div class="chapter-tools"><label><input type="checkbox" id="show-margin" checked> Margin references</label>${hasConv ? '<label><input type="checkbox" id="show-conv" checked> Modern measures</label>' : ''}${ch.notes.length ? `<a href="#notes">Notes ↓</a>` : ''}</div>
   <div class="scripture">${verses.join('\n')}</div>
@@ -515,8 +516,8 @@ function renderAnnotatedChapter(book, n) {
   ${ch.notes.length ? `<section class="notes" id="notes"><h2>Notes</h2>${notes.join('\n')}</section>` : ''}
   ${hasConv ? `<p class="conv-note">${CONVERSION_NOTE}</p>` : ''}
   <nav class="pager" aria-label="Previous and next">
-    ${prev ? `<a class="prev" href="${book.meta.slug}-${prev}.html"><span>Previous</span>${book.meta.name} ${prev}</a>` : `<a class="prev" href="${book.meta.slug}.html"><span>Previous</span>Introduction</a>`}
-    ${next ? `<a class="next" href="${book.meta.slug}-${next}.html"><span>Next</span>${book.meta.name} ${next}</a>` : '<span></span>'}
+    ${prev ? `<a class="prev" href="${book.meta.slug}-${prev}.html"><span>Previous</span>${chName} ${prev}</a>` : `<a class="prev" href="${book.meta.slug}.html"><span>Previous</span>Introduction</a>`}
+    ${next ? `<a class="next" href="${book.meta.slug}-${next}.html"><span>Next</span>${chName} ${next}</a>` : '<span></span>'}
   </nav>
 </article>`;
   fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title, body, toc: annotatedToc(book.meta.slug, n), bodyClass: 'annotated' }));
