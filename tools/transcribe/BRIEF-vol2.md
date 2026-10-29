@@ -26,6 +26,11 @@ with commentary) into Markdown. Your prompt names the book, its folder, its KJV 
 - **Concluding remarks.** Many books end with a section "CONCLUDING REMARKS ON THE BOOK OF …". Put it in the notes block, after
   the last chapter's notes: a heading line `## Concluding Remarks on the Book of Judges.` (Title Case, as printed), then its
   paragraphs. Then `<!-- end of book -->` at the end of the book.
+- **Psalms.** Each psalm is a chapter: `<!-- chapter: 23 -->`, then `<!-- summary -->` with Brown's italic summary if printed,
+  then `<!-- text -->`. A psalm's printed title above verse 1 ("A Psalm of David.", "To the chief Musician …") goes on its own line
+  `title: A Psalm of David.` directly after that `<!-- text -->` and before verse 1. The KJV prefill does not include titles: type
+  them from the scan (keys and italics as printed). "Selah" stays in its verse as printed. Notes headings are `## Psalm XXIII.`
+  (a printed "PSALM XXIII." heading); if the print says "CHAPTER", still write `## Psalm …`.
 - **Footnotes in the notes.** A small footnote at the foot of the notes, keyed by a superscript in a notes paragraph: write the key
   as `{1}` where it sits in that paragraph, and the footnote as its own paragraph starting `{1} ` right after it.
 - Conventions (follow the Volume I files): keys `{a}` / `{1}`; a margin entry continued from the previous page is `?:? | …`
