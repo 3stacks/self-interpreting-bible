@@ -31,6 +31,7 @@ with commentary) into Markdown. Your prompt names the book, its folder, its KJV 
   `title: A Psalm of David.` directly after that `<!-- text -->` and before verse 1. The KJV prefill does not include titles: type
   them from the scan (keys and italics as printed). "Selah" stays in its verse as printed. Notes headings are `## Psalm XXIII.`
   (a printed "PSALM XXIII." heading); if the print says "CHAPTER", still write `## Psalm …`.
+  A margin entry keyed in a psalm title is filed under verse 1 (`34:1 a`); the build links title keys to it.
 - **Footnotes in the notes.** A small footnote at the foot of the notes, keyed by a superscript in a notes paragraph: write the key
   as `{1}` where it sits in that paragraph, and the footnote as its own paragraph starting `{1} ` right after it.
 - Conventions (follow the Volume I files): keys `{a}` / `{1}`; a margin entry continued from the previous page is `?:? | …`
@@ -51,7 +52,8 @@ Transcription agents have been cut off by a false content-filter block, losing u
 2. **Do not type the notes yourself either.** For each notes column, find its box on the scan (full-resolution pixel
    coordinates, tight to the column, excluding the column rules), then append the OCR text to the file:
    `python3 -I /tmp/claude-1000/-workspace/11c3aba7-d2df-4701-8fe5-4738fe21800f/scratchpad/sib/ocrappend.py <scan> <x> <y> <w> <h> <output file>`
-   It appends the column as one running line (line-end hyphens joined). Then compare with full-resolution tiles and fix it
+   It appends the column as one running line (line-end hyphens joined). **Compare the OCR with the scan for missing
+   lines**: if lines are missing, delete that OCR text and run again on smaller strips (the helper deskews and uses Tesseract psm 6). Then compare with full-resolution tiles and fix it
    with **small, targeted edits** only: OCR misreadings, paragraph breaks (replace the space before "Ver. 5." with a blank
    line), `## Chapter X.` headings, `**Reflections.**—`, italics, small capitals, a real hyphen that the join removed, and a
    word split across columns. Never retype a paragraph, and never put more than a short phrase in one edit's new text.

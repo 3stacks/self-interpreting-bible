@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """OCR one column crop of a page scan and append the text to a page file.
 
-Usage: python3 -I ocrappend.py <scan.png> <x> <y> <w> <h> <out.md>
+Usage: python3 -I ocrappend.py <scan.png> <x> <y> <w> <h> <out.md> [psm]
+
+psm is the Tesseract page segmentation mode (default 6, a single column). The crop is deskewed first.
+If text is missing, run again on smaller strips.
 
 The crop is taken at full resolution and upscaled 200% for Tesseract. Lines are joined into
 one running paragraph: a hyphen at a line end joins the word halves, other line ends become a
@@ -15,10 +18,11 @@ import sys
 import tempfile
 
 png, x, y, w, h, out = sys.argv[1], *map(int, sys.argv[2:6]), sys.argv[6]
+psm = sys.argv[7] if len(sys.argv) > 7 else "6"
 with tempfile.TemporaryDirectory() as tmp:
     crop = os.path.join(tmp, "crop.png")
-    subprocess.run(["convert", png, "-crop", f"{w}x{h}+{x}+{y}", "+repage", "-resize", "200%", crop], check=True)
-    res = subprocess.run(["tesseract", crop, "stdout", "--psm", "4", "-l", "eng"], check=True,
+    subprocess.run(["convert", png, "-crop", f"{w}x{h}+{x}+{y}", "+repage", "-deskew", "40%", "+repage", "-resize", "200%", crop], check=True)
+    res = subprocess.run(["tesseract", crop, "stdout", "--psm", psm, "-l", "eng"], check=True,
                          capture_output=True, text=True)
 lines = [l.strip() for l in res.stdout.splitlines()]
 text = ""
