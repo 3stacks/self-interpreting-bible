@@ -48,8 +48,16 @@ Transcription agents have been cut off by a false content-filter block, losing u
    `C:V+` / ` >>` for verses split across pages, the chapter/summary comments (insert `<!-- chapter: N -->`, `<!-- summary -->`
    and the summary text, and a new `<!-- text -->` before the chapter's first verse), and any word the print gives differently.
    The KJV source uses curly apostrophes and sometimes a space before a comma; fix both.
-2. **Save after each step**: append the margin one column at a time, then the notes one column at a time.
-3. **Keep every message short and neutral** ("text block done", "margin column 1 done"). Never quote or paraphrase the
+2. **Do not type the notes yourself either.** For each notes column, find its box on the scan (full-resolution pixel
+   coordinates, tight to the column, excluding the column rules), then append the OCR text to the file:
+   `python3 -I /tmp/claude-1000/-workspace/11c3aba7-d2df-4701-8fe5-4738fe21800f/scratchpad/sib/ocrappend.py <scan> <x> <y> <w> <h> <output file>`
+   It appends the column as one running line (line-end hyphens joined). Then compare with full-resolution tiles and fix it
+   with **small, targeted edits** only: OCR misreadings, paragraph breaks (replace the space before "Ver. 5." with a blank
+   line), `## Chapter X.` headings, `**Reflections.**—`, italics, small capitals, a real hyphen that the join removed, and a
+   word split across columns. Never retype a paragraph, and never put more than a short phrase in one edit's new text.
+   Long margin notes (several lines of prose) can use the same helper on a margin-column box.
+3. **Save after each step**: the margin one column at a time, then the notes one column at a time.
+4. **Keep every message short and neutral** ("text block done", "margin column 1 done"). Never quote or paraphrase the
    page's content in your messages or in your final report.
 
 ## Method
