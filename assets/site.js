@@ -116,12 +116,27 @@
   });
 
   // ---------- Bible reader ----------
+  // A transcribed chapter opens on its own page, with Brown's notes. This reader remains for the rest.
+  const annotatedMap = () => {
+    try { return JSON.parse($('#annotated-chapters')?.textContent || '{}'); } catch { return {}; }
+  };
+  const annotatedUrl = () => {
+    const h = decodeURIComponent(location.hash.slice(1) || '') || store.get('sib:last') || 'Gen.1';
+    const [code, chS, vS] = h.split('.');
+    const book = annotatedMap()[code];
+    const ch = +chS || 1;
+    if (!book?.chapters?.includes(ch)) return '';
+    const v = +vS;
+    return `${book.slug}-${ch}.html${v ? `#v${ch}-${v}` : ''}`;
+  };
   if (document.body.classList.contains('bible')) {
     const selB = $('#rb'), selC = $('#rc');
     let backlinks;
     const loadBacklinks = () => (backlinks ??= fetch('backlinks.json').then((r) => r.json()));
 
     async function render() {
+      const url = annotatedUrl();
+      if (url) { location.replace(url); return; }
       const books = await loadBooks();
       const h = decodeURIComponent(location.hash.slice(1)) || store.get('sib:last') || 'Gen.1';
       let [code, ch, v] = h.split('.');
@@ -150,8 +165,9 @@
 
       const bl = await loadBacklinks();
       const annotated = bl.annotated?.[code]?.includes(ch);
-      $('#reader-annotated').innerHTML = annotated
-        ? `<a href="genesis-${ch}.html">Read ${esc(meta[1])} ${ch} with Brown’s margin and notes →</a>` : '';
+      const annSlug = bl.annotatedSlug?.[code];
+      $('#reader-annotated').innerHTML = annotated && annSlug
+        ? `<a href="${annSlug}-${ch}.html">Read ${esc(meta[1])} ${ch} with Brown’s margin and notes →</a>` : '';
       const hits = bl.refs[`${code}.${ch}`] || [];
       $('#cited').innerHTML = hits.length
         ? `<h2>Cited in this edition</h2><ul>${hits.map(([slug, id, ref]) => {
@@ -163,7 +179,11 @@
     selB.addEventListener('change', () => { location.hash = `${selB.value}.1`; });
     selC.addEventListener('change', () => { location.hash = `${selB.value}.${selC.value}`; });
     addEventListener('hashchange', render);
-    render();
+    if (!annotatedUrl()) render();
+  }
+  const chapterPage = $('article.chapter');
+  if (chapterPage?.dataset.code && chapterPage.dataset.chapter) {
+    store.set('sib:last', `${chapterPage.dataset.code}.${chapterPage.dataset.chapter}`);
   }
 
   // ---------- Annotated chapters: margin on/off ----------
@@ -199,9 +219,9 @@
     input.addEventListener('input', run);
     $('#search-form').addEventListener('submit', (e) => e.preventDefault());
   }
-  // ---------- Years: B.C. as printed, or Anno Mundi ----------
+  // ---------- Years: Anno Mundi by default, or B.C. as printed ----------
   // Ussher's reckoning, as the book pairs them (A.M. 130 = B.C. 3874): A.M. = 4004 − B.C., and A.D. 1 = A.M. 4004.
-  // Year columns are found by their headings. Where a table prints A.M. beside B.C., the B.C. column is hidden instead.
+  // Year columns are found by their headings. Where a table prints both, the other column is hidden.
   const main = $('main');
   const toAM = (n, era) => (era === 'ad' ? 4003 + n : Math.max(1, 4004 - n));
   const conv = (n, era) => `<span class="era-conv" title="${n} ${era === 'ad' ? 'A.D.' : 'B.C.'} as printed">${toAM(n, era)}</span>`;
@@ -287,22 +307,48 @@
     saved.clear();
     $$('.era-hide', main || document).forEach((el) => el.classList.remove('era-hide'));
   };
+  // B.C. mode keeps the printed numbers and hides a twin Anno Mundi column.
+  const toBCView = () => {
+    if (!main) return false;
+    let changed = false;
+    for (const table of $$('table', main)) {
+      const heads = $$('thead th', table);
+      const kind = heads.map((th) => (IS_AM.test(th.textContent) ? 'am' : IS_BC.test(th.textContent) ? 'bc' : IS_AD.test(th.textContent.trim()) ? 'ad' : ''));
+      if (!kind.includes('am') || !kind.includes('bc')) continue;
+      kind.forEach((k, i) => {
+        if (k !== 'am') return;
+        heads[i].classList.add('era-hide');
+        changed = true;
+      });
+      for (const tr of $$('tbody tr', table)) {
+        const cells = [...tr.children];
+        kind.forEach((k, i) => { if (k === 'am' && cells[i]) cells[i].classList.add('era-hide'); });
+      }
+    }
+    return changed;
+  };
+  const eraNote = (text) => {
+    const note = document.createElement('p');
+    note.className = 'era-note';
+    note.textContent = text;
+    ($('h1', main)?.closest('header') || $('h1', main))?.after(note);
+  };
   const eraBtns = $$('.era-toggle button');
-  const setEra = (era) => {
+  const setEra = (era, persist) => {
     toPrinted();
     $('.era-note')?.remove();
     if (era === 'am' && toAMView() && main) {
-      const note = document.createElement('p');
-      note.className = 'era-note';
-      note.innerHTML = 'Years are shown <b>Anno Mundi</b>, from the Creation, converted on Ussher’s reckoning (A.M. = 4004 − B.C.). They are approximate. Hover a year to see the date as printed.';
-      ($('h1', main)?.closest('header') || $('h1', main))?.after(note);
+      eraNote('These years are Anno Mundi (A.M.). A.M. counts from the Creation. A.M. equals 4004 minus the year before Christ (B.C.). The years are approximate. To see the printed date, point at a year.');
+    }
+    if (era === 'bc' && toBCView() && main) {
+      eraNote('These years are before Christ (B.C.). The book prints them in this form.');
     }
     document.documentElement.dataset.era = era;
     eraBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.era === era)));
-    store.set('sib:era', era);
+    if (persist) store.set('sib:era', era);
   };
-  eraBtns.forEach((b) => b.addEventListener('click', () => setEra(b.dataset.era)));
-  if (store.get('sib:era') === 'am') setEra('am');
+  eraBtns.forEach((b) => b.addEventListener('click', () => setEra(b.dataset.era, true)));
+  setEra(store.get('sib:era') === 'bc' ? 'bc' : 'am', false);
   // ---------- Corrections ----------
   // Served by serve.mjs, the site can take corrections: "Edit mode" puts a ✎ on every block that
   // knows its source lines (data-src), and saving writes the transcription and rebuilds.

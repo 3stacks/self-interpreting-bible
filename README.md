@@ -13,11 +13,12 @@ section, and a KJV popover on every scripture reference.
 - `lib/refs.mjs`: the scripture-reference parser. It reads Roman chapters ("Ps. lxviii. 4, 5; lxix. 1"),
   bare chapters that take their book from the reference before them, and one-chapter books.
   Each reference is checked against the KJV, and anything that does not resolve goes on the proofing list.
-- `lib/contents.mjs`: the thematic grouping of sections on the contents page.
+- `lib/contents.mjs` groups the aids that stand before Genesis. `lib/volumes.mjs` lists the four printed volumes.
 - `lib/genealogy.mjs`: draws the lifespan chart for the Genealogy of the Patriarchs.
-- `assets/`: the CSS and JS for the site (popovers, scan viewer, table filters, Bible reader, search,
-  and the B.C./A.M. year toggle). The toggle converts on Ussher's reckoning (A.M. = 4004 − B.C., A.D. 1 = A.M. 4004).
-  It finds year columns by their headings, so new tables need a "Before Christ" / "Year of the World" / "Year" heading.
+- `assets/`: the CSS and JS for the site (popovers, scan viewer, table filters, Bible reader, search, and the year control).
+- The year control shows Anno Mundi (A.M.) first. A.M. counts from the Creation. A.M. equals 4004 minus the year before Christ (B.C.). A.D. 1 equals A.M. 4004. To see the printed years, choose B.C.
+- The control reads the column headings "Before Christ", "Year of the World", and "Year". A new table must use one of those headings.
+- The Bible link opens a transcribed chapter with Brown's notes. When that chapter is on the site, a scripture reference opens that chapter. Any other chapter opens as the King James text.
 - `data/kjv-src.json`: KJV text (thiagobodruk/bible, public domain).
 
 ## Annotated books (Genesis onward)
