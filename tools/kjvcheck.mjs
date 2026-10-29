@@ -8,7 +8,12 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const kjv = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/kjv-src.json'), 'utf8').replace(/^﻿/, ''));
-const gen = kjv[0].chapters;
+// transcription/<book>/ picks the KJV book. Loose pdfNNN.md files stay on Genesis.
+const BOOK_AT = { genesis: 0, exodus: 1, leviticus: 2, numbers: 3, deuteronomy: 4, joshua: 5 };
+const chaptersFor = (file) => {
+  const m = file.replace(/\\/g, '/').match(/transcription\/([a-z0-9-]+)\//);
+  return kjv[BOOK_AT[m?.[1]] ?? 0].chapters;
+};
 const words = (s) => s.replace(/\^[a-z0-9*†‡§]+/gi, ' ').replace(/[¶*_]/g, ' ').replace(/\{[^}]*\}/g, ' ')
   .toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter(Boolean);
 
@@ -21,7 +26,7 @@ for (const file of process.argv.slice(2)) {
     const [, c, v, cont, rest] = line.match(/^(\d+):(\d+)(\+)? (.*)$/);
     const more = /\s>>$/.test(rest);
     const got = words(rest.replace(/\s>>$/, ''));
-    const want = words(gen[c - 1]?.[v - 1] ?? '');
+    const want = words(chaptersFor(file)[c - 1]?.[v - 1] ?? '');
     checked++;
     if (!want.length) { console.log(`${path.basename(file)} ${c}:${v}  no such verse in the KJV`); bad++; continue; }
     const W = want.join(' '), G = got.join(' ');

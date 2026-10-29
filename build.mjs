@@ -7,8 +7,10 @@ import { marked } from 'marked';
 import { BOOKS, BOOK_NAME } from './lib/books.mjs';
 import { makeLinker } from './lib/refs.mjs';
 import { PARTS } from './lib/contents.mjs';
+import { VOLUMES } from './lib/volumes.mjs';
 import { renderGenealogyChart } from './lib/genealogy.mjs';
 import { parseBook, toRoman } from './lib/genesis.mjs';
+import { ANNOTATED } from './lib/annotated.mjs';
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const OUT = path.join(ROOT, 'build');
@@ -83,32 +85,91 @@ function markSource(body, file, first) {
 }
 const srcAttr = (parts) => (parts?.length ? ` data-src="${parts.map((p) => `${p.file}:${p.start}-${p.end}`).join(';')}"` : '');
 
-// ---------- Genesis, with Brown's text, margin and notes ----------
-const GEN = parseBook(path.join(ROOT, 'transcription', 'genesis'));
-const genSlug = (n) => `genesis-${n}`;
-const genPrinted = (pdf) => GEN.printed[pdf] ?? VOLUME.pdfToPrinted(pdf);
-const genChapters = [...GEN.chapters.keys()].filter((n) => GEN.chapters.get(n).verses.size).sort((a, b) => a - b);
+// ---------- Annotated books (Genesis, Exodus, …), with Brown's text, margin and notes ----------
+const books = [];
+for (const meta of ANNOTATED) {
+  const dir = path.join(ROOT, 'transcription', meta.dir);
+  if (!fs.existsSync(dir)) continue;
+  const parsed = parseBook(dir);
+  if (!parsed.pages.length) continue;
+  const chapters = [...parsed.chapters.keys()].filter((n) => parsed.chapters.get(n).verses.size).sort((a, b) => a - b);
+  books.push({ meta, parsed, chapters });
+}
+const printedOf = (book, pdf) => book.parsed.printed[pdf] ?? VOLUME.pdfToPrinted(pdf);
+
+// ImageMagick's `convert` is not on every machine. Python/Pillow does the same rotates.
+function hasConvert() {
+  try { execFileSync('convert', ['-version'], { stdio: 'ignore' }); return true; } catch { return false; }
+}
+const USE_CONVERT = hasConvert();
+function convertImage(src, dst, { rotate = 0, trim = false, resize = null, quality = 80 } = {}) {
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  if (USE_CONVERT) {
+    const args = [src];
+    if (rotate) args.push('-rotate', String(rotate));
+    if (trim) args.push('-trim');
+    if (resize) args.push('-resize', resize);
+    if (/\.jpe?g$/.test(dst)) args.push('-quality', String(quality));
+    args.push(dst);
+    execFileSync('convert', args);
+    return;
+  }
+  const script = `
+from PIL import Image, ImageChops
+im = Image.open(${JSON.stringify(src)})
+if im.mode not in ("RGB", "L"):
+    im = im.convert("L")
+rot = ${rotate}
+if rot % 360:
+    im = im.rotate(-rot, expand=True)
+if ${trim ? "True" : "False"}:
+    bg = Image.new(im.mode, im.size, 255 if im.mode == "L" else (255, 255, 255))
+    bbox = ImageChops.difference(im, bg).getbbox()
+    if bbox:
+        im = im.crop(bbox)
+spec = ${resize ? JSON.stringify(resize) : "None"}
+if spec:
+    m = int(spec.rstrip("x"))
+    w, h = im.size
+    if w >= h:
+        im = im.resize((m, max(1, round(h * m / w))), Image.Resampling.LANCZOS)
+    else:
+        im = im.resize((max(1, round(w * m / h)), m), Image.Resampling.LANCZOS)
+out = ${JSON.stringify(dst)}
+if out.endswith(".jpg") or out.endswith(".jpeg"):
+    im.convert("L").save(out, quality=${quality})
+else:
+    im.save(out)
+`;
+  execFileSync('python3.12', ['-c', script]);
+}
 
 // ---------- Scans (stored upside down in the PDF; turn them upright for the web) ----------
-for (const pdf of new Set([...sections.values()].flatMap((s) => s.pages).concat(GEN.pages))) {
+const scanPages = new Set([...sections.values()].flatMap((s) => s.pages));
+for (const book of books) for (const pdf of book.parsed.pages) scanPages.add(pdf);
+for (const pdf of scanPages) {
   const src = path.join(ROOT, 'scans', `pdf${String(pdf).padStart(3, '0')}.png`);
   const dst = path.join(OUT, 'scans', `pdf${String(pdf).padStart(3, '0')}.png`);
-  if (fs.existsSync(src) && !fs.existsSync(dst)) execFileSync('convert', [src, '-rotate', '180', dst]);
+  if (fs.existsSync(src) && !fs.existsSync(dst)) convertImage(src, dst, { rotate: 180 });
 }
 // Most plates are printed sideways with the caption up the right edge; turn those upright.
 const UPRIGHT_PLATES = new Set([253, 255]);
-for (const { pdf } of GEN.plates) {
-  const src = path.join(OUT, 'scans', `pdf${pdf}.png`);
-  const turn = UPRIGHT_PLATES.has(pdf) ? [] : ['-rotate', '90'];
-  const thumb = path.join(OUT, 'scans', `thumb-pdf${pdf}.jpg`), big = path.join(OUT, 'scans', `plate-pdf${pdf}.jpg`);
-  if (!fs.existsSync(thumb)) execFileSync('convert', [src, ...turn, '-trim', '-resize', '1000x', '-quality', '78', thumb]);
-  if (!fs.existsSync(big)) execFileSync('convert', [src, ...turn, '-trim', '-resize', '2400x', '-quality', '82', big]);
+for (const book of books) {
+  for (const { pdf } of book.parsed.plates) {
+    const src = path.join(OUT, 'scans', `pdf${pdf}.png`);
+    const thumb = path.join(OUT, 'scans', `thumb-pdf${pdf}.jpg`);
+    const big = path.join(OUT, 'scans', `plate-pdf${pdf}.jpg`);
+    const rotate = UPRIGHT_PLATES.has(pdf) ? 0 : 90;
+    if (!fs.existsSync(thumb)) convertImage(src, thumb, { rotate, trim: true, resize: '1000x', quality: 78 });
+    if (!fs.existsSync(big)) convertImage(src, big, { rotate, trim: true, resize: '2400x', quality: 82 });
+  }
 }
 
 // ---------- Rendering ----------
 const rejected = {}; // slug → refs that looked like scripture but didn't validate
 let currentSlug = '';
-const linker = makeLinker(kjv, (r) => (rejected[currentSlug] ??= []).push(r));
+const annotatedHref = Object.fromEntries(books.map((b) => [b.meta.code, { slug: b.meta.slug, chapters: new Set(b.chapters) }]));
+const linker = makeLinker(kjv, (r) => (rejected[currentSlug] ??= []).push(r), annotatedHref);
 const backlinks = {}; // "Gen.10" → [{slug, id}]
 const searchDocs = [];
 const unsure = [];
@@ -201,21 +262,40 @@ const contentsOrder = [...PARTS.flatMap((p) => p.slugs.filter((s) => sections.ha
 const other = order.filter((s) => !partOf[s]);
 const parts = [...PARTS, ...(other.length ? [{ title: 'Other Tables', blurb: '', slugs: other }] : [])];
 
-function sidebar(active) {
-  return parts.map((p) => {
-    const items = p.slugs.filter((s) => sections.has(s));
-    if (!items.length) return '';
-    return `<div class="toc-part"><p class="toc-head">${p.title}</p><ul>${items
-      .map((s) => `<li><a href="${s}.html"${s === active ? ' aria-current="page"' : ''}>${sections.get(s).title}</a></li>`)
-      .join('')}</ul></div>`;
-  }).join('');
+function tocLinks(slugs, active) {
+  return slugs.filter((s) => sections.has(s))
+    .map((s) => `<li><a href="${s}.html"${s === active ? ' aria-current="page"' : ''}>${sections.get(s).title}</a></li>`)
+    .join('');
 }
 
-function layout({ title, body, active = '', bodyClass = '', withToc = true, toc = null }) {
+function sidebar(active) {
+  const jump = `<div class="toc-part"><p class="toc-head">Volumes</p><ul>
+    <li><a href="index.html#volume-1">Volume I</a></li>
+    <li><a href="index.html#before-genesis">Before Genesis</a></li>
+    <li><a href="index.html#volume-2">Volume II</a></li>
+    <li><a href="index.html#volume-3">Volume III</a></li>
+    <li><a href="index.html#volume-4">Volume IV</a></li>
+  </ul></div>`;
+  const groups = parts.map((p) => {
+    const body = p.groups
+      ? p.groups.map((g) => {
+        const items = tocLinks(g.slugs, active);
+        return items ? `<p class="toc-sub">${g.title}</p><ul>${items}</ul>` : '';
+      }).join('')
+      : `<ul>${tocLinks(p.slugs, active)}</ul>`;
+    if (!body.includes('<li>')) return '';
+    return `<div class="toc-part"><p class="toc-head">${p.title}</p>${body}</div>`;
+  }).join('');
+  return jump + groups;
+}
+
+function layout({ title, body, active = '', bodyClass = '', withToc = true, toc = null, head = '' }) {
   return `<!doctype html>
-<html lang="en-GB"${REPO ? ` data-repo="${REPO}" data-branch="${BRANCH}"` : ''}>
+<html lang="en-GB" data-era="am"${REPO ? ` data-repo="${REPO}" data-branch="${BRANCH}"` : ''}>
 <head>
 <meta charset="utf-8">
+<script>try{if(localStorage.getItem("sib:era")==="bc")document.documentElement.dataset.era="bc"}catch(e){}</script>
+${head}
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${title === SITE ? SITE : `${stripTags(title)} · ${SITE}`}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -235,7 +315,7 @@ function layout({ title, body, active = '', bodyClass = '', withToc = true, toc 
       <a href="search.html">Search</a>
       <a href="proofing.html">Proofing</a>
       <button type="button" id="edit-toggle" class="edit-toggle" aria-pressed="false" hidden title="Show a ✎ on every passage, to correct the transcription">Edit</button>
-      <span class="era-toggle" role="group" aria-label="Show years as"><button type="button" data-era="bc" aria-pressed="true" title="Years before Christ, as printed">B.C.</button><button type="button" data-era="am" aria-pressed="false" title="Anno Mundi: years from the Creation, on Ussher's reckoning">A.M.</button></span>
+      <span class="era-toggle" role="group" aria-label="Show years as"><button type="button" data-era="am" aria-pressed="true" title="Anno Mundi (A.M.). Years from the Creation.">A.M.</button><button type="button" data-era="bc" aria-pressed="false" title="Before Christ (B.C.). The years the book prints.">B.C.</button></span>
     </nav>
   </div>
 </header>
@@ -300,15 +380,26 @@ const inline = (md) => marked.parseInline(md, { gfm: true })
   .replace(/\[\?\]/g, '<span class="unsure" title="Uncertain reading of the scan">?</span>')
   .replace(/\[illegible\]/g, '<span class="unsure illegible" title="Unreadable in the scan">illegible</span>');
 
-function genToc(active) {
+function chapterCells(book, activeChapter) {
   const cells = [];
-  for (let n = 1; n <= 50; n++) {
-    cells.push(GEN.chapters.get(n)?.verses.size
-      ? `<a href="${genSlug(n)}.html"${active === n ? ' aria-current="page"' : ''}>${n}</a>`
+  for (let n = 1; n <= book.meta.chapters; n++) {
+    const on = activeChapter === n;
+    cells.push(book.parsed.chapters.get(n)?.verses.size
+      ? `<a href="${book.meta.slug}-${n}.html"${on ? ' aria-current="page"' : ''}>${n}</a>`
       : `<span>${n}</span>`);
   }
-  return `<div class="toc-part"><p class="toc-head"><a href="genesis.html">Genesis</a></p><div class="ch-grid">${cells.join('')}</div></div>
-<div class="toc-part"><p class="toc-head"><a href="index.html">Comprehensive Aids</a></p></div>`;
+  return cells.join('');
+}
+
+function annotatedToc(activeSlug, activeChapter) {
+  const vol1 = books.map((book) => {
+    const onBook = book.meta.slug === activeSlug;
+    return `<div class="toc-part"><p class="toc-head"><a href="${book.meta.slug}.html"${onBook && activeChapter === 0 ? ' aria-current="page"' : ''}>${book.meta.name}</a></p><div class="ch-grid">${chapterCells(book, onBook ? activeChapter : 0)}</div></div>`;
+  }).join('\n');
+  return `<div class="toc-part"><p class="toc-head">Volume I</p></div>
+${vol1}
+<div class="toc-part"><p class="toc-head"><a href="index.html#before-genesis">Before Genesis</a></p></div>
+<div class="toc-part"><p class="toc-head"><a href="index.html#volume-2">Volumes II to IV</a></p></div>`;
 }
 
 function marginDate(d) {
@@ -317,11 +408,11 @@ function marginDate(d) {
   return `<p class="mdate">${escapeHtml(d)}</p>`;
 }
 
-function renderGenesisChapter(n) {
-  const ch = GEN.chapters.get(n);
-  const slug = genSlug(n);
+function renderAnnotatedChapter(book, n) {
+  const ch = book.parsed.chapters.get(n);
+  const slug = `${book.meta.slug}-${n}`;
   currentSlug = slug;
-  const title = `Genesis ${n}`;
+  const title = `${book.meta.name} ${n}`;
   extraTitles[slug] = title;
   const record = (id, html, src) => {
     const text = stripTags(html);
@@ -383,10 +474,10 @@ function renderGenesisChapter(n) {
     let marker = '';
     if (vs.pdf && !pdfSeen.has(vs.pdf)) {
       pdfSeen.add(vs.pdf);
-      const label = `Vol. ${VOLUME.roman}, p. ${genPrinted(vs.pdf)}`;
+      const label = `Vol. ${VOLUME.roman}, p. ${printedOf(book, vs.pdf)}`;
       marker = `<div class="page-marker"><span>${label}</span><button type="button" class="scan-btn" data-scan="scans/pdf${vs.pdf}.png" data-label="${label}">View page scan</button></div>`;
     }
-    const plates = GEN.plates.filter((pl) => pl.after?.c === n && pl.after?.v === vs.v).map((pl) => {
+    const plates = book.parsed.plates.filter((pl) => pl.after?.c === n && pl.after?.v === vs.v).map((pl) => {
       // "TITLE. [Genesis, xiii:3.]—Description…": set the title apart from the description.
       const cut = pl.caption.search(/\]\s*[—.-]*/);
       const title = cut > 0 ? pl.caption.slice(0, pl.caption.indexOf(']', cut) + 1) : pl.caption.split(/(?<=\.)\s/)[0];
@@ -397,74 +488,120 @@ function renderGenesisChapter(n) {
   });
   const loose = ch.margin.map((e) => `${e.date ? marginDate(e.date) : ''}<p class="ment"${srcAttr(e.src)}><b>${escapeHtml(e.key)}</b> ${linker.linkHtml(inline(e.text))}${e.v ? ` <span class="muted">(ver. ${e.v})</span>` : ''}</p>`).join('');
 
-  const i = genChapters.indexOf(n);
-  const prev = genChapters[i - 1], next = genChapters[i + 1];
-  const printed = ch.pages.map(genPrinted);
+  const i = book.chapters.indexOf(n);
+  const prev = book.chapters[i - 1], next = book.chapters[i + 1];
+  const printed = ch.pages.map((pdf) => printedOf(book, pdf));
   const body = `
-<article class="section chapter" data-slug="${slug}">
-  <p class="eyebrow">The First Book of Moses, called Genesis</p>
-  <h1>Genesis ${n}</h1>
+<article class="section chapter" data-slug="${slug}" data-code="${book.meta.code}" data-chapter="${n}">
+  <p class="eyebrow">${book.meta.eyebrow}</p>
+  <h1>${book.meta.name} ${n}</h1>
   <p class="source">Chapter ${toRoman(n)} · Vol. ${VOLUME.roman}, ${printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : `p. ${printed[0]}`}</p>
   ${ch.summary ? `<p class="summary"${srcAttr(ch.summary.src)}>${linker.linkHtml(inline(ch.summary.text))}</p>` : ''}
-  <div class="chapter-tools"><label><input type="checkbox" id="show-margin" checked> Margin references</label><a href="bible.html#Gen.${n}">Plain KJV</a>${ch.notes.length ? `<a href="#notes">Notes ↓</a>` : ''}</div>
+  <div class="chapter-tools"><label><input type="checkbox" id="show-margin" checked> Margin references</label>${ch.notes.length ? `<a href="#notes">Notes ↓</a>` : ''}</div>
   <div class="scripture">${verses.join('\n')}</div>
   ${loose ? `<aside class="loose-margin"><h2>Other margin entries</h2>${loose}</aside>` : ''}
   ${ch.notes.length ? `<section class="notes" id="notes"><h2>Notes</h2>${notes.join('\n')}</section>` : ''}
   <nav class="pager" aria-label="Previous and next">
-    ${prev ? `<a class="prev" href="${genSlug(prev)}.html"><span>Previous</span>Genesis ${prev}</a>` : '<a class="prev" href="genesis.html"><span>Previous</span>Introduction</a>'}
-    ${next ? `<a class="next" href="${genSlug(next)}.html"><span>Next</span>Genesis ${next}</a>` : '<span></span>'}
+    ${prev ? `<a class="prev" href="${book.meta.slug}-${prev}.html"><span>Previous</span>${book.meta.name} ${prev}</a>` : `<a class="prev" href="${book.meta.slug}.html"><span>Previous</span>Introduction</a>`}
+    ${next ? `<a class="next" href="${book.meta.slug}-${next}.html"><span>Next</span>${book.meta.name} ${next}</a>` : '<span></span>'}
   </nav>
 </article>`;
-  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title, body, toc: genToc(n), bodyClass: 'annotated' }));
+  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title, body, toc: annotatedToc(book.meta.slug, n), bodyClass: 'annotated' }));
 }
 
-if (genChapters.length) {
-  for (const n of genChapters) renderGenesisChapter(n);
-  extraTitles.genesis = 'Genesis';
+for (const book of books) {
+  for (const n of book.chapters) renderAnnotatedChapter(book, n);
+  extraTitles[book.meta.slug] = book.meta.name;
   const introBody = `
 <article class="section">
   <p class="eyebrow">Volume ${VOLUME.roman}</p>
-  <h1>${escapeHtml(GEN.title || 'Genesis')}</h1>
-  <p class="source">With John Brown’s marginal references, notes and reflections · Vol. ${VOLUME.roman}, p. ${genPrinted(GEN.pages[0])}</p>
-  ${GEN.intro.map((p) => `<p${srcAttr(p.src)}>${linker.linkHtml(inline(p.text))}</p>`).join('\n')}
+  <h1>${escapeHtml(book.parsed.title || book.meta.name)}</h1>
+  <p class="source">With John Brown’s marginal references, notes and reflections · Vol. ${VOLUME.roman}, p. ${printedOf(book, book.parsed.pages[0])}</p>
+  ${book.parsed.intro.map((p) => `<p${srcAttr(p.src)}>${linker.linkHtml(inline(p.text))}</p>`).join('\n')}
   <h2>Chapters</h2>
-  <div class="ch-grid big">${Array.from({ length: 50 }, (_, k) => k + 1).map((n) => (genChapters.includes(n) ? `<a href="${genSlug(n)}.html">${n}</a>` : `<span>${n}</span>`)).join('')}</div>
+  <div class="ch-grid big">${chapterCells(book, 0)}</div>
 </article>`;
-  fs.writeFileSync(path.join(OUT, 'genesis.html'), layout({ title: 'Genesis', body: introBody, toc: genToc(0) }));
+  fs.writeFileSync(path.join(OUT, `${book.meta.slug}.html`), layout({ title: book.meta.name, body: introBody, toc: annotatedToc(book.meta.slug, 0) }));
 }
 
 // ---------- Contents ----------
 const totalRefs = Object.values(backlinks).reduce((a, l) => a + l.length, 0);
+
+function nameList(items, live) {
+  return `<ul class="name-list">${items.map((b) => {
+    const on = live && b.slug && books.some((book) => book.meta.slug === b.slug);
+    return on
+      ? `<li><a href="${b.slug}.html">${b.name}</a></li>`
+      : `<li class="wait">${b.name}</li>`;
+  }).join('')}</ul>`;
+}
+
+function aidLists(p) {
+  const blocks = (p.groups || [{ title: '', slugs: p.slugs }]).map((g) => {
+    const items = g.slugs.filter((s) => sections.has(s));
+    if (!items.length) return '';
+    const lis = items.map((s) => {
+      const sec = sections.get(s);
+      return `<li><a href="${s}.html">${sec.title}</a><span class="pg">${VOLUME.pdfToPrinted(sec.pages[0])}</span></li>`;
+    }).join('');
+    return `${g.title ? `<p class="group-label">${g.title}</p>` : ''}<ol>${lis}</ol>`;
+  }).join('');
+  if (!blocks.includes('<li>')) return '';
+  return `<section class="part" id="${p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}">
+  <h4>${p.title}</h4>
+  ${p.blurb ? `<p class="part-blurb">${p.blurb}</p>` : ''}
+  ${blocks}
+</section>`;
+}
+
+function volumeBlock(vol) {
+  const grids = vol.roman === 'I'
+    ? books.map((book) => `<section class="book-block">
+    <h4><a href="${book.meta.slug}.html">${book.meta.name}</a></h4>
+    <div class="ch-grid big">${chapterCells(book, 0)}</div>
+  </section>`).join('\n')
+    : '';
+  const extras = (vol.extras || []).map((g) => `<h3>${g.title}</h3>${nameList(g.books, false)}`).join('\n');
+  const bookHtml = `<h3 id="${vol.id}-text">The text</h3>
+  ${nameList(vol.books, true)}
+  ${grids}`;
+  const aids = vol.roman === 'I'
+    ? `<div class="preface" id="before-genesis">
+    <h3>Before Genesis</h3>
+    <p class="volume-note">Blackwood's aids stand before the text of Genesis. The groups below follow the order of the printed volume.</p>
+    <div class="aid-grid">
+${parts.map(aidLists).join('\n')}
+    </div>
+  </div>`
+    : '';
+  const absent = vol.books.some((b) => !(b.slug && books.some((book) => book.meta.slug === b.slug)));
+  const note = absent
+    ? `<p class="volume-note">${vol.roman === 'I'
+      ? 'If a name has no link, the site does not have that book yet.'
+      : 'The site does not have this volume yet.'}</p>`
+    : '';
+  return `<section class="volume" id="${vol.id}">
+  <h2><span>Volume ${vol.roman}</span>${vol.span}</h2>
+  ${note}
+  ${vol.extrasFirst ? extras : ''}
+  ${bookHtml}
+  ${vol.extrasFirst ? '' : extras}
+  ${aids}
+</section>`;
+}
 const indexBody = `
 <section class="hero">
-  <p class="eyebrow">Volume ${VOLUME.roman} · Genesis to Joshua</p>
+  <p class="eyebrow">Four volumes</p>
   <h1>The Self-Interpreting Bible</h1>
-  <p class="lede">John Brown of Haddington’s family Bible, with its explanatory notes, reflections and marginal references. Genesis is here in full: the text with Brown’s centre-column references, his explanatory notes and the reflections on every chapter. So are Blackwood’s <em>Comprehensive Aids to the Study of the Bible</em>: tables of chronology, prophecy, kings and priests, glossaries and indexes. Everything is transcribed from the printed pages, with every scripture reference linked to the text.</p>
+  <p class="lede">This site gives the Self-Interpreting Bible of John Brown. Volume I has the text, the margin references, the notes, and the reflections. The same volume has Blackwood's aids before Genesis.</p>
   <dl class="facts">
     <div><dt>Tables and essays</dt><dd>${contentsOrder.length}</dd></div>
-    <div><dt>Pages transcribed</dt><dd>${(files.length + GEN.pages.length).toLocaleString('en-GB')}</dd></div>
+    <div><dt>Pages transcribed</dt><dd>${(files.length + books.reduce((n, b) => n + b.parsed.pages.length, 0)).toLocaleString('en-GB')}</dd></div>
     <div><dt>Scripture references linked</dt><dd>${totalRefs.toLocaleString('en-GB')}</dd></div>
   </dl>
 </section>
 <div class="contents">
-${genChapters.length ? `<section class="part">
-  <h2>Genesis, with Brown’s Notes</h2>
-  <p class="part-blurb">The text of Genesis with the centre-column references, the explanatory notes and the reflections on each chapter.</p>
-  <p><a href="genesis.html">Introduction to Genesis</a></p>
-  <div class="ch-grid big">${Array.from({ length: 50 }, (_, k) => k + 1).map((n) => (genChapters.includes(n) ? `<a href="${genSlug(n)}.html">${n}</a>` : `<span>${n}</span>`)).join('')}</div>
-</section>` : ''}
-${parts.map((p) => {
-  const items = p.slugs.filter((s) => sections.has(s));
-  if (!items.length) return '';
-  return `<section class="part">
-  <h2>${p.title}</h2>
-  ${p.blurb ? `<p class="part-blurb">${p.blurb}</p>` : ''}
-  <ol>${items.map((s) => {
-    const sec = sections.get(s);
-    return `<li><a href="${s}.html">${sec.title}</a><span class="pg">${VOLUME.pdfToPrinted(sec.pages[0])}</span></li>`;
-  }).join('')}</ol>
-</section>`;
-}).join('\n')}
+${VOLUMES.map((vol) => volumeBlock(vol)).join('\n')}
 </div>
 <p class="colophon">Scripture text: King James Version (1769). Transcriptions are a first pass from the scanned pages; question marks in the text flag uncertain readings. See the <a href="proofing.html">proofing list</a>.</p>`;
 const indexHtml = layout({ title: SITE, body: indexBody, bodyClass: 'home', withToc: false });
@@ -494,7 +631,10 @@ const bibleBody = `
   </div>
   <nav class="pager" id="reader-pager" aria-label="Previous and next chapter"></nav>
 </article>`;
-fs.writeFileSync(path.join(OUT, 'bible.html'), layout({ title: 'Bible', body: bibleBody, bodyClass: 'bible', withToc: false }));
+const annotatedJump = Object.fromEntries(books.map((b) => [b.meta.code, { slug: b.meta.slug, chapters: b.chapters }]));
+const bibleHead = `<script id="annotated-chapters" type="application/json">${JSON.stringify(annotatedJump)}</script>
+<script>try{var map=JSON.parse(document.getElementById("annotated-chapters").textContent);var raw=location.hash.slice(1)||localStorage.getItem("sib:last")||"Gen.1";var parts=decodeURIComponent(raw).split(".");var book=map[parts[0]];var ch=+parts[1]||1;if(book&&book.chapters.indexOf(ch)>=0){var v=+parts[2];location.replace(book.slug+"-"+ch+".html"+(v?"#v"+ch+"-"+v:""))}}catch(e){}</script>`;
+fs.writeFileSync(path.join(OUT, 'bible.html'), layout({ title: 'Bible', body: bibleBody, bodyClass: 'bible', withToc: false, head: bibleHead }));
 
 // ---------- Search ----------
 const searchBody = `
@@ -527,8 +667,10 @@ fs.writeFileSync(path.join(OUT, 'proofing.html'), layout({ title: 'Proofing List
 // ---------- Data + assets ----------
 const titles = { ...Object.fromEntries(order.map((s) => [s, sections.get(s).title])), ...extraTitles };
 fs.writeFileSync(path.join(OUT, 'search-index.json'), JSON.stringify({ titles, docs: searchDocs }));
-fs.writeFileSync(path.join(OUT, 'backlinks.json'), JSON.stringify({ titles, refs: backlinks, annotated: { Gen: genChapters } }));
+const annotated = Object.fromEntries(books.map((b) => [b.meta.code, b.chapters]));
+const annotatedSlug = Object.fromEntries(books.map((b) => [b.meta.code, b.meta.slug]));
+fs.writeFileSync(path.join(OUT, 'backlinks.json'), JSON.stringify({ titles, refs: backlinks, annotated, annotatedSlug }));
 for (const f of ['site.css', 'site.js']) fs.copyFileSync(path.join(ROOT, 'assets', f), path.join(OUT, f));
 
-console.log(`genesis chapters: ${genChapters.length}  sections: ${order.length}  refs linked: ${totalRefs}  uncertain: ${unsure.length}  unmatched: ${Object.values(rejected).flat().length}`);
+console.log(`books: ${books.map((b) => `${b.meta.name} ${b.chapters.length}`).join(', ') || 'none'}  sections: ${order.length}  refs linked: ${totalRefs}  uncertain: ${unsure.length}  unmatched: ${Object.values(rejected).flat().length}`);
 for (const [slug, rs] of Object.entries(rejected)) console.log(`  unmatched in ${slug}: ${rs.slice(0, 8).join(' | ')}${rs.length > 8 ? ' …' : ''}`);
