@@ -512,7 +512,9 @@ function renderAnnotatedChapter(book, n) {
   <p class="source">${book.meta.chapterName ?? 'Chapter'} ${toRoman(n)} · Vol. ${ROMAN[book.vol]}, ${printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : `p. ${printed[0]}`}</p>
   ${ch.summary ? `<p class="summary"${srcAttr(ch.summary.src)}>${linker.linkHtml(inline(ch.summary.text))}</p>` : ''}
   <div class="chapter-tools"><label><input type="checkbox" id="show-margin" checked> Margin references</label>${hasConv ? '<label><input type="checkbox" id="show-conv" checked> Modern measures</label>' : ''}${ch.notes.length ? `<a href="#notes">Notes ↓</a>` : ''}</div>
-  ${ch.title ? `<p class="ps-title"${srcAttr(ch.title.src)}>${linker.linkHtml(inline(ch.title.text))}</p>` : ''}
+  ${ch.title ? `<p class="ps-title"${srcAttr(ch.title.src)}>${linker.linkHtml(inline(ch.title.text))
+    // Keys in a psalm's title point at margin entries filed under verse 1.
+    .replace(/\{([a-z0-9*†‡§]{1,3})\}/gi, (m, k) => `<sup class="key"><a href="#m${n}-1-${k}">${k}</a></sup>`)}</p>` : ''}
   <div class="scripture">${verses.join('\n')}</div>
   ${loose ? `<aside class="loose-margin"><h2>Other margin entries</h2>${loose}</aside>` : ''}
   ${ch.notes.length ? `<section class="notes" id="notes"><h2>Notes</h2>${notes.join('\n')}</section>` : ''}
