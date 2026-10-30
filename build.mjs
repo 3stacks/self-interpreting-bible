@@ -11,7 +11,7 @@ import { VOLUMES } from './lib/volumes.mjs';
 import { renderGenealogyChart } from './lib/genealogy.mjs';
 import { parseBook, toRoman } from './lib/genesis.mjs';
 import { ANNOTATED } from './lib/annotated.mjs';
-import { annotateMeasures, CONVERSION_NOTE } from './lib/measures.mjs';
+import { annotateMeasures, annotateMeasuresPage, CONVERSION_NOTE, PAGE_CONVERSION_NOTE } from './lib/measures.mjs';
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const OUT = path.join(ROOT, 'build');
@@ -228,6 +228,7 @@ function renderSection(s) {
     if (inner.includes('class="unsure')) unsure.push([s.slug, id, text, attrs.match(/data-src="([^"]+)"/)?.[1]]);
   }
 
+  if (s.slug === 'measures-weights-coins') html = annotateMeasuresPage(html);
   html = html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>');
   html = html.replace(/<div class="page-break" data-pdf="(\d+)"><\/div>/g, (m, pdf) => pageMarker(+pdf, s));
 
@@ -375,7 +376,9 @@ contentsOrder.forEach((slug, i) => {
   <p class="eyebrow">${part ? part.title : 'Comprehensive Aids'}</p>
   <h1>${s.title}</h1>
   <p class="source">Blackwood’s Comprehensive Aids to the Study of the Bible · Vol. ${VOLUME.roman}, ${pageRange}</p>
+  ${rendered.get(slug).includes('class="conv') ? '<div class="chapter-tools"><label><input type="checkbox" id="show-conv" checked> Modern measures</label></div>' : ''}
   ${rendered.get(slug)}
+  ${rendered.get(slug).includes('class="conv') ? `<p class="conv-note">${slug === 'measures-weights-coins' ? PAGE_CONVERSION_NOTE : CONVERSION_NOTE}</p>` : ''}
   <nav class="pager" aria-label="Previous and next">
     ${prev ? `<a class="prev" href="${prev}.html"><span>Previous</span>${sections.get(prev).title}</a>` : '<span></span>'}
     ${next ? `<a class="next" href="${next}.html"><span>Next</span>${sections.get(next).title}</a>` : '<span></span>'}
