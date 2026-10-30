@@ -42,10 +42,12 @@ function parseSrc(src) {
 }
 const readLines = (file) => fs.readFileSync(sourcePath(file), 'utf8').split('\n');
 
+// The proofing tools are in the site only when the build has SIB_PROOFING=1.
+const BUILD_ENV = { ...process.env, SIB_PROOFING: '1' };
 let queue = Promise.resolve(); // one correction (and rebuild) at a time
 function rebuild() {
   return new Promise((resolve, reject) => {
-    const p = spawn(process.execPath, ['build.mjs'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(process.execPath, ['build.mjs'], { cwd: ROOT, env: BUILD_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
     let err = '';
     p.stderr.on('data', (d) => { err += d; });
     p.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`build failed: ${err.slice(-500)}`))));
@@ -132,7 +134,11 @@ function handler(req, res) {
   return serveStatic(req, res, url);
 }
 
-if (!fs.existsSync(path.join(BUILD, 'index.html'))) execFileSync(process.execPath, ['build.mjs'], { cwd: ROOT, stdio: 'inherit' });
+// Rebuild when there is no build, or when the build has no proofing tools (a deploy build).
+const index = path.join(BUILD, 'index.html');
+if (!fs.existsSync(index) || !fs.readFileSync(index, 'utf8').includes('id="edit-toggle"')) {
+  execFileSync(process.execPath, ['build.mjs'], { cwd: ROOT, env: BUILD_ENV, stdio: 'inherit' });
+}
 
 let server;
 if (process.env.SIB_TLS) {

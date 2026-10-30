@@ -58,8 +58,13 @@ the page scan. Saving:
 
 Review with `git diff`, commit, and push to deploy. The Proofing page lists recent corrections.
 
-On the hosted site there is no server, so ✎ opens the source file in GitHub's editor instead
-(the repository comes from the Actions run; locally, set `{"repo": "user/name"}` in `site.config.json`).
+The proofing tools are for local work only. The tools are the Proofing page, the **Edit** button and the ✎ buttons.
+`serve.mjs` builds the site with `SIB_PROOFING=1`, so the tools are there.
+A plain `npm run build` leaves them out. The deploy uses a plain build, so the hosted site has no proofing tools.
+If `serve.mjs` finds a build without the tools, it builds the site again.
+
+To make ✎ open GitHub's editor in a build with no server, run `SIB_PROOFING=1 npm run build`.
+Then set `{"repo": "user/name"}` in `site.config.json`.
 
 ## Deploy to Cloudflare Pages
 

@@ -320,8 +320,8 @@ ${head}
       <a href="index.html">Contents</a>
       <a href="bible.html">Bible</a>
       <a href="search.html">Search</a>
-      <a href="proofing.html">Proofing</a>
-      <button type="button" id="edit-toggle" class="edit-toggle" aria-pressed="false" hidden title="Show a ✎ on every passage, to correct the transcription">Edit</button>
+      ${PROOFING ? `<a href="proofing.html">Proofing</a>
+      <button type="button" id="edit-toggle" class="edit-toggle" aria-pressed="false" hidden title="Show a ✎ on every passage, to correct the transcription">Edit</button>` : ''}
       <span class="era-toggle" role="group" aria-label="Show years as"><button type="button" data-era="am" aria-pressed="true" title="Anno Mundi (A.M.). Years from the Creation.">A.M.</button><button type="button" data-era="bc" aria-pressed="false" title="Before Christ (B.C.). The years the book prints.">B.C.</button></span>
     </nav>
   </div>
@@ -335,7 +335,7 @@ ${head}
   <div class="scan-bar"><span id="scan-label"></span><button type="button" id="scan-close">Close</button></div>
   <div class="scan-frame"><img id="scan-img" alt="Scan of the printed page"></div>
 </dialog>
-<dialog class="fix-dialog" id="fix-dialog">
+${PROOFING ? `<dialog class="fix-dialog" id="fix-dialog">
   <form id="fix-form" method="dialog">
     <h2>Correct the transcription</h2>
     <p class="fix-current" id="fix-current"></p>
@@ -344,7 +344,7 @@ ${head}
     <label class="fix-note">Note (optional) <input id="fix-note" type="text" placeholder="e.g. checked against the scan"></label>
     <div class="fix-actions"><span id="fix-status" aria-live="polite"></span><button type="button" id="fix-cancel">Cancel</button><button type="submit" id="fix-save">Save correction</button></div>
   </form>
-</dialog>
+</dialog>` : ''}
 <script src="site.js"></script>
 </body>
 </html>
@@ -354,7 +354,10 @@ const SITE = 'The Self-Interpreting Bible';
 // Where the transcriptions live on GitHub, for "correct this" links on a static host.
 // In GitHub Actions these come from the run; locally from site.config.json if present.
 const CONFIG = fs.existsSync(path.join(ROOT, 'site.config.json')) ? JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')) : {};
-const REPO = process.env.GITHUB_REPOSITORY || CONFIG.repo || '';
+// The proofing tools (the Proofing list, Edit mode and the ✎ buttons) are for local work only.
+// serve.mjs builds with SIB_PROOFING=1. A plain build, such as the deploy build, leaves them out.
+const PROOFING = process.env.SIB_PROOFING === '1';
+const REPO = PROOFING ? process.env.GITHUB_REPOSITORY || CONFIG.repo || '' : '';
 const BRANCH = process.env.GITHUB_REF_NAME || CONFIG.branch || 'main';
 
 // ---------- Section pages ----------
@@ -574,6 +577,30 @@ function aidLists(p) {
 
 function volumeBlock(vol) {
   const volN = ROMAN.indexOf(vol.roman);
+  // Volume I opens with Blackwood's aids. Show them beside the books, so the contents page does not hide them below six chapter grids.
+  if (vol.roman === 'I') {
+    const blocks = books.filter((b) => b.vol === volN).map((book) => `<section class="book-block">
+      <h4><a href="${book.meta.slug}.html">${book.meta.name}</a><span class="ch-count">${book.chapters.length} chapters</span></h4>
+      <div class="ch-grid">${chapterCells(book, 0)}</div>
+    </section>`).join('\n');
+    return `<section class="volume vol-split" id="${vol.id}">
+  <h2><span>Volume ${vol.roman}</span>${vol.span}</h2>
+  <div class="split">
+    <div class="split-text">
+      <h3 id="${vol.id}-text">The text</h3>
+      <p class="volume-note">Each book has its own introduction. Open the book name to read it.</p>
+      ${blocks}
+    </div>
+    <aside class="split-aids" id="before-genesis" aria-labelledby="before-genesis-h">
+      <h3 id="before-genesis-h">Before Genesis: Blackwood's aids</h3>
+      <p class="volume-note">The printed volume opens with these histories, tables and essays. The groups follow the order of the printed volume.</p>
+      <div class="aid-cols">
+${parts.map(aidLists).join('\n')}
+      </div>
+    </aside>
+  </div>
+</section>`;
+  }
   const grids = books.some((b) => b.vol === volN)
     ? books.filter((b) => b.vol === volN).map((book) => `<section class="book-block">
     <h4><a href="${book.meta.slug}.html">${book.meta.name}</a></h4>
@@ -584,15 +611,6 @@ function volumeBlock(vol) {
   const bookHtml = `<h3 id="${vol.id}-text">The text</h3>
   ${nameList(vol.books, true)}
   ${grids}`;
-  const aids = vol.roman === 'I'
-    ? `<div class="preface" id="before-genesis">
-    <h3>Before Genesis</h3>
-    <p class="volume-note">Blackwood's aids stand before the text of Genesis. The groups below follow the order of the printed volume.</p>
-    <div class="aid-grid">
-${parts.map(aidLists).join('\n')}
-    </div>
-  </div>`
-    : '';
   const absent = vol.books.some((b) => !(b.slug && books.some((book) => book.meta.slug === b.slug)));
   const note = absent
     ? `<p class="volume-note">${books.some((b) => b.vol === volN)
@@ -605,14 +623,13 @@ ${parts.map(aidLists).join('\n')}
   ${vol.extrasFirst ? extras : ''}
   ${bookHtml}
   ${vol.extrasFirst ? '' : extras}
-  ${aids}
 </section>`;
 }
 const indexBody = `
 <section class="hero">
   <p class="eyebrow">Four volumes</p>
   <h1>The Self-Interpreting Bible</h1>
-  <p class="lede">This site gives the Self-Interpreting Bible of John Brown. Volume I has the text, the margin references, the notes, and the reflections. The same volume has Blackwood's aids before Genesis.</p>
+  <p class="lede">This site gives the Self-Interpreting Bible of John Brown, with the text, the margin references, the notes and the reflections. Volume I opens with Blackwood's aids: histories of each period, tables of kings and prophecies, measures and money, and guides on how to read the Bible and pray.</p>
   <dl class="facts">
     <div><dt>Tables and essays</dt><dd>${contentsOrder.length}</dd></div>
     <div><dt>Pages transcribed</dt><dd>${(files.length + books.reduce((n, b) => n + b.parsed.pages.length, 0)).toLocaleString('en-GB')}</dd></div>
@@ -622,7 +639,7 @@ const indexBody = `
 <div class="contents">
 ${VOLUMES.map((vol) => volumeBlock(vol)).join('\n')}
 </div>
-<p class="colophon">Scripture text: King James Version (1769). Transcriptions are a first pass from the scanned pages; question marks in the text flag uncertain readings. See the <a href="proofing.html">proofing list</a>.</p>`;
+<p class="colophon">Scripture text: King James Version (1769). Transcriptions are a first pass from the scanned pages; question marks in the text flag uncertain readings.${PROOFING ? ' See the <a href="proofing.html">proofing list</a>.' : ''}</p>`;
 const indexHtml = layout({ title: SITE, body: indexBody, bodyClass: 'home', withToc: false });
 fs.writeFileSync(path.join(OUT, 'index.html'), indexHtml);
 // The Artifact host supplies the document skeleton for the main page, so emit a bare-body copy.
@@ -681,7 +698,7 @@ const proofBody = `
   <h2>Unmatched references (${Object.values(rejected).flat().length})</h2>
   <ul class="proof">${Object.entries(rejected).map(([slug, rs]) => `<li><a href="${slug}.html">${sections.get(slug)?.title ?? extraTitles[slug] ?? slug}</a> ${rs.map((r) => `<code>${escapeHtml(r)}</code>`).join(' ')}</li>`).join('')}</ul>
 </article>`;
-fs.writeFileSync(path.join(OUT, 'proofing.html'), layout({ title: 'Proofing List', body: proofBody, bodyClass: 'proofing', withToc: false }));
+if (PROOFING) fs.writeFileSync(path.join(OUT, 'proofing.html'), layout({ title: 'Proofing List', body: proofBody, bodyClass: 'proofing', withToc: false }));
 
 // ---------- Data + assets ----------
 const titles = { ...Object.fromEntries(order.map((s) => [s, sections.get(s).title])), ...extraTitles };

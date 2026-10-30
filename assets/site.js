@@ -382,7 +382,8 @@
     });
     store.set('sib:editing', on ? '1' : '0');
   };
-  fetch('api/ping').then((r) => r.ok && r.json()).then((j) => { apiOk = !!j?.ok; }).catch(() => {}).finally(() => {
+  // A deploy build has no Edit button, so it never asks for the API.
+  if (editBtn) fetch('api/ping').then((r) => r.ok && r.json()).then((j) => { apiOk = !!j?.ok; }).catch(() => {}).finally(() => {
     if (!apiOk && !repo) return;
     if (editBtn) editBtn.hidden = false;
     // The proofing list is for correcting, so its ✎ buttons are always on.
