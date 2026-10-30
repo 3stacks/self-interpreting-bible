@@ -1,0 +1,40 @@
+# Builds the site and publishes it to Cloudflare Pages on every push to main.
+# One-time setup: add the repo secrets CLOUDFLARE_API_TOKEN (permission "Cloudflare Pages: Edit")
+# and CLOUDFLARE_ACCOUNT_ID. Without them, the build runs and the deploy steps are skipped.
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-pages
+  cancel-in-progress: false
+
+env:
+  PROJECT: self-interpreting-bible
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The build turns the page scans upright with ImageMagick's `convert`.
+      - run: command -v convert || (sudo apt-get update && sudo apt-get install -y imagemagick)
+      - run: npm ci
+      - run: node build.mjs
+      # Create the Pages project on the first run. Later runs find it and go on.
+      - if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx -y wrangler@4 pages project create "$PROJECT" --production-branch=main || true
+      - if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx -y wrangler@4 pages deploy build --project-name="$PROJECT" --branch=main --commit-dirty=true

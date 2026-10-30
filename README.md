@@ -58,13 +58,22 @@ the page scan. Saving:
 
 Review with `git diff`, commit, and push to deploy. The Proofing page lists recent corrections.
 
-On GitHub Pages there is no server, so ✎ opens the source file in GitHub's editor instead
+On the hosted site there is no server, so ✎ opens the source file in GitHub's editor instead
 (the repository comes from the Actions run; locally, set `{"repo": "user/name"}` in `site.config.json`).
 
-## Deploying to GitHub Pages
+## Deploy to Cloudflare Pages
 
-`.github/workflows/pages.yml` builds and publishes on every push to `main`. Once, in the repository's
-Settings → Pages, set Source to **GitHub Actions**.
+`.github/workflows/cloudflare.yml` builds the site and publishes it on every push to `main`.
+The first run creates the Pages project `self-interpreting-bible`.
+
+Do these steps one time:
+
+1. In Cloudflare, create an API token with the permission **Account → Cloudflare Pages → Edit**.
+2. In the repository's Settings → Secrets and variables → Actions, add the secret `CLOUDFLARE_API_TOKEN`.
+3. Add the secret `CLOUDFLARE_ACCOUNT_ID`. Copy the account ID from the Cloudflare dashboard.
+4. In the Actions tab, run **Deploy to Cloudflare Pages**.
+
+Without the secrets, the workflow builds the site and skips the deploy.
 
 ## Adding pages
 
