@@ -1,6 +1,6 @@
 # Builds the site and publishes it to Cloudflare Pages on every push to main.
-# One-time setup: add the repo secrets CLOUDFLARE_API_TOKEN (permission "Cloudflare Pages: Edit")
-# and CLOUDFLARE_ACCOUNT_ID. Without them, the build runs and the deploy steps are skipped.
+# One-time setup: give this repo the secret CLOUDFLARE_API_TOKEN (permission "Cloudflare Pages: Edit").
+# Without it, the build runs and the deploy steps are skipped.
 name: Deploy to Cloudflare Pages
 
 on:
@@ -18,7 +18,8 @@ concurrency:
 env:
   PROJECT: self-interpreting-bible
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  # The account ID is not secret. It is in the dashboard URLs.
+  CLOUDFLARE_ACCOUNT_ID: 66bbbf59d9ee8948f770553dfc0d5721
 
 jobs:
   deploy:
