@@ -8,8 +8,9 @@ for (const dir of process.argv.slice(2)) {
     if (!/<!--\s*text\s*-->/.test(src)) continue;
     const empty = [];
     for (const kind of ['text', 'margin', 'notes']) {
-      const m = src.match(new RegExp(`<!--\\s*${kind}\\s*-->([\\s\\S]*?)(?=<!--\\s*(?:text|margin|notes|summary|intro)\\s*-->|<!--\\s*chapter:|$)`));
-      const body = m ? m[1].replace(/<!--[\s\S]*?-->/g, '').trim() : '';
+      // A page can have several blocks of one kind (a text block per chapter); one with content is enough.
+      const blocks = [...src.matchAll(new RegExp(`<!--\\s*${kind}\\s*-->([\\s\\S]*?)(?=<!--\\s*(?:text|margin|notes|summary|intro)\\s*-->|<!--\\s*chapter:|$)`, 'g'))];
+      const body = blocks.map((m) => m[1].replace(/<!--[\s\S]*?-->/g, '').trim()).join('');
       if (!body) empty.push(kind);
     }
     if (empty.length) console.log(`${dir}/${f}: empty ${empty.join(', ')}`);
