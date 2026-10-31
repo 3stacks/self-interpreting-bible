@@ -90,6 +90,7 @@ h2:hover .hash, h3:hover .hash, .hash:focus { opacity: 1; }
 .section > p, .section > ul, .section > ol, .section > blockquote { max-width: var(--measure); }
 .section p { margin: 0 0 1em; }
 .section > p > em:only-child { color: var(--muted); }
+.section[data-slug="metrical-psalms"] p:has(br) { margin: 0.2rem 0 0.85rem; line-height: 1.45; }
 
 .page-marker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.8rem; margin: 2rem 0 1rem; font-family: var(--f-ui); font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .page-marker::before { content: ""; flex: 0 0 1.5rem; border-top: 1px solid var(--rule); }

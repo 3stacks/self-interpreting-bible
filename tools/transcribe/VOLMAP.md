@@ -63,7 +63,7 @@ Bel and the Dragon: 450 (starts part-way down page 450), ends 450
 Prayer of Manasses: 451 (starts top of page 451), ends part-way down 451
 1 Maccabees: 451-467 (starts part-way down page 451), ends part-way down 467
 2 Maccabees: 467-479 (starts part-way down page 467), ends 479
-other: Psalms of David in Metre 480-529 (starts top of 480)
+other: Psalms of David in Metre 480-529 (section metrical-psalms; 480 is a two-column preface; 481-529 are three columns, read left to right, notes then metre in each column)
 other: Table of First Lines of the Psalms 530
 other: Translations and Paraphrases in Verse 531-542 (a table of first lines of the paraphrases is at the foot of 542)
 other: Hymns 543 (printed page 1677)

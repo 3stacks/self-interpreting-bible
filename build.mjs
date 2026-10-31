@@ -200,7 +200,8 @@ const GLOSSARIES = new Set(['obsolete-words', 'glossary-of-symbolic-words', 'pre
 
 function renderSection(s) {
   currentSlug = s.slug;
-  let html = marked.parse(s.md, { gfm: true });
+  // The metrical Psalms keep one printed line as one row. A single newline becomes a break.
+  let html = marked.parse(s.md, { gfm: true, breaks: s.slug === 'metrical-psalms' });
   // Transcriber comments: chart notes and margin dates become visible; layout notes are dropped.
   html = html.replace(/<!--\s*chart:\s*([\s\S]*?)-->/g, (m, d) => `<p class="chart-note"><span>Transcriber’s note</span> ${escapeHtml(d.trim())}</p>`);
   html = html.replace(/<!--\s*editor:\s*([\s\S]*?)-->/g, (m, d) => `<p class="chart-note"><span>Editor’s note</span> ${escapeHtml(d.trim())}</p>`);
