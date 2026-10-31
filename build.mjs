@@ -44,23 +44,32 @@ for (const f of files) {
   const pdf = +f.slice(3, 6);
   const text = fs.readFileSync(path.join(ROOT, 'transcription', f), 'utf8');
   const marks = [...text.matchAll(/<!--\s*(section|continued):\s*([a-z0-9-]+)\s*-->/g)];
+  const vol = +(text.match(/<!--\s*volume:\s*(\d+)\s*-->/)?.[1] || 1);
+  const printedNum = text.match(/<!--\s*page:\s*\d+\s+printed:\s*(\d+)/)?.[1];
+  const printed = printedNum ? +printedNum : (vol === 1 ? pdf - 3 : null);
   marks.forEach((mk, i) => {
     const [, kind, slug] = mk;
     const from = mk.index + mk[0].length;
     const raw = text.slice(from, marks[i + 1]?.index ?? text.length);
     let s = sections.get(slug);
     if (!s) {
-      s = { slug, title: slug, pages: [], md: '' };
+      s = { slug, title: slug, pages: [], pageMeta: {}, plates: [], md: '' };
       sections.set(slug, s);
       order.push(slug);
     }
-    if (kind === 'section') {
-      const h = raw.match(/^#\s+(.+)$/m);
-      if (h) s.title = h[1].trim().replace(/[,:;.]+$/, '');
-    }
+    const h = raw.match(/^#\s+(.+)$/m);
+    if (h && (kind === 'section' || s.title === slug)) s.title = h[1].trim().replace(/[,:;.]+$/, '');
     if (!s.pages.includes(pdf)) s.pages.push(pdf);
-    const body = markSource(raw, f, text.slice(0, from).split('\n').length);
-    s.md += `\n\n<div class="page-break" data-pdf="${pdf}"></div>\n\n` + body.replace(/^#\s+.+$/m, '');
+    s.pageMeta[pdf] = { vol, printed };
+    const ill = raw.match(/<!--\s*illustration:\s*([\s\S]*?)-->/);
+    const prose = raw.replace(/<!--[\s\S]*?-->/g, '').replace(/^#\s+.+$/m, '').trim();
+    if (ill && !prose) {
+      s.plates.push({ pdf, caption: ill[1].replace(/\s+/g, ' ').trim() });
+      s.md += `\n\n<div class="page-break" data-pdf="${pdf}" data-plate="1"></div>\n\n`;
+    } else {
+      const body = markSource(raw, f, text.slice(0, from).split('\n').length);
+      s.md += `\n\n<div class="page-break" data-pdf="${pdf}"></div>\n\n` + body.replace(/^#\s+.+$/m, '');
+    }
   });
 }
 
@@ -150,7 +159,8 @@ else:
 }
 
 // ---------- Scans (stored upside down in the PDF; turn them upright for the web) ----------
-const scanPages = new Set([...sections.values()].flatMap((s) => s.pages).map((pdf) => `1:${pdf}`));
+const scanPages = new Set();
+for (const s of sections.values()) for (const pdf of s.pages) scanPages.add(`${s.pageMeta[pdf]?.vol ?? 1}:${pdf}`);
 for (const book of books) for (const pdf of book.parsed.pages) scanPages.add(`${book.vol}:${pdf}`);
 for (const key of scanPages) {
   const [vol, pdf] = key.split(':').map(Number);
@@ -160,17 +170,17 @@ for (const key of scanPages) {
 }
 // Most plates are printed sideways with the caption up the right edge; turn those upright.
 const UPRIGHT_PLATES = new Set([253, 255]);
-for (const book of books) {
-  for (const { pdf } of book.parsed.plates) {
-    const dir = path.join(OUT, scanDir(book.vol));
-    const src = path.join(dir, `pdf${pad3(pdf)}.png`);
-    const thumb = path.join(dir, `thumb-pdf${pdf}.jpg`);
-    const big = path.join(dir, `plate-pdf${pdf}.jpg`);
-    const rotate = book.vol === 1 && UPRIGHT_PLATES.has(pdf) ? 0 : 90;
-    if (!fs.existsSync(thumb)) convertImage(src, thumb, { rotate, trim: true, resize: '1000x', quality: 78 });
-    if (!fs.existsSync(big)) convertImage(src, big, { rotate, trim: true, resize: '2400x', quality: 82 });
-  }
+function writePlateImages(vol, pdf) {
+  const dir = path.join(OUT, scanDir(vol));
+  const src = path.join(dir, `pdf${pad3(pdf)}.png`);
+  const thumb = path.join(dir, `thumb-pdf${pdf}.jpg`);
+  const big = path.join(dir, `plate-pdf${pdf}.jpg`);
+  const rotate = vol === 1 && UPRIGHT_PLATES.has(pdf) ? 0 : 90;
+  if (!fs.existsSync(thumb)) convertImage(src, thumb, { rotate, trim: true, resize: '1000x', quality: 78 });
+  if (!fs.existsSync(big)) convertImage(src, big, { rotate, trim: true, resize: '2400x', quality: 82 });
 }
+for (const book of books) for (const { pdf } of book.parsed.plates) writePlateImages(book.vol, pdf);
+for (const s of sections.values()) for (const pl of s.plates) writePlateImages(s.pageMeta[pl.pdf]?.vol ?? 1, pl.pdf);
 
 // ---------- Rendering ----------
 const rejected = {}; // slug → refs that looked like scripture but didn't validate
@@ -182,6 +192,8 @@ const searchDocs = [];
 const unsure = [];
 
 const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Drop caps and small capitals are stored as one span. Put that span back after escaping.
+const restoreSmallCaps = (s) => s.replace(/&lt;span class="sc"&gt;([\s\S]*?)&lt;\/span&gt;/g, '<span class="sc">$1</span>');
 const stripTags = (s) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
 const slugify = (s) => stripTags(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const GLOSSARIES = new Set(['obsolete-words', 'glossary-of-symbolic-words', 'precious-stones', 'trees-and-plants', 'mountains-and-hills', 'rivers-lakes-seas']);
@@ -201,6 +213,7 @@ function renderSection(s) {
   }).replace(/\s*⟦[^⟧]+⟧/g, '');
   html = html.replace(/\[\?\]/g, '<span class="unsure" title="Uncertain reading of the scan">?</span>');
   html = html.replace(/\[illegible\]/g, '<span class="unsure illegible" title="Unreadable in the scan">illegible</span>');
+  html = html.replace(/\{([0-9]{1,2})\}/g, '<sup class="fn">$1</sup>');
   html = linker.linkHtml(html);
 
   // Anchors for headings, rows and paragraphs so search results and backlinks can point at them.
@@ -230,19 +243,34 @@ function renderSection(s) {
 
   if (s.slug === 'measures-weights-coins') html = annotateMeasuresPage(html);
   html = html.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>');
-  html = html.replace(/<div class="page-break" data-pdf="(\d+)"><\/div>/g, (m, pdf) => pageMarker(+pdf, s));
+  html = html.replace(/<div class="page-break" data-pdf="(\d+)"( data-plate="1")?><\/div>/g, (m, pdf, plate) => {
+    const marker = pageMarker(+pdf, s);
+    if (!plate) return marker;
+    const pl = s.plates.find((p) => p.pdf === +pdf);
+    return pl ? marker + plateFigure(s.pageMeta[pl.pdf]?.vol ?? 1, pl) : marker;
+  });
 
   if (s.slug === 'genealogy-of-the-patriarchs') html = renderGenealogyChart(s.md) + html;
   if (GLOSSARIES.has(s.slug)) html = letterIndex(html) ;
   return html;
 }
 
+function plateFigure(vol, pl) {
+  const cut = pl.caption.search(/\]\s*[—.-]*/);
+  const title = cut > 0 ? pl.caption.slice(0, pl.caption.indexOf(']', cut) + 1) : pl.caption.split(/(?<=\.)\s/)[0];
+  const rest = pl.caption.slice(title.length).replace(/^[\s—.-]+/, '');
+  return `<figure class="plate"><button type="button" class="scan-btn plate-btn" data-scan="${scanDir(vol)}/plate-pdf${pl.pdf}.jpg" data-label="${escapeHtml(title)}" aria-label="Enlarge: ${escapeHtml(title)}"><img src="${scanDir(vol)}/thumb-pdf${pl.pdf}.jpg" alt="${escapeHtml(title)}" loading="lazy"></button><figcaption><b>${escapeHtml(title)}</b>${rest ? ` ${escapeHtml(rest)}` : ''}</figcaption></figure>`;
+}
+
 function pageMarker(pdf, s) {
+  const meta = s.pageMeta?.[pdf] ?? { vol: 1, printed: VOLUME.pdfToPrinted(pdf) };
   const first = s.pages[0] === pdf;
-  const label = `Vol. ${VOLUME.roman}, p. ${VOLUME.pdfToPrinted(pdf)}`;
-  return `<div class="page-marker${first ? ' first' : ''}" id="p${VOLUME.pdfToPrinted(pdf)}">
+  const roman = ROMAN[meta.vol] || VOLUME.roman;
+  const label = meta.printed ? `Vol. ${roman}, p. ${meta.printed}` : `Vol. ${roman}, plate`;
+  const id = meta.printed ? ` id="p${meta.printed}"` : '';
+  return `<div class="page-marker${first ? ' first' : ''}"${id}>
   <span>${first ? 'Begins' : 'Continues'} on ${label}</span>
-  <button type="button" class="scan-btn" data-scan="scans/pdf${String(pdf).padStart(3, '0')}.png" data-label="${label}">View page scan</button>
+  <button type="button" class="scan-btn" data-scan="${scanDir(meta.vol)}/pdf${pad3(pdf)}.png" data-label="${label}">View page scan</button>
 </div>`;
 }
 
@@ -267,7 +295,9 @@ function letterIndex(html) {
 const partOf = {};
 for (const p of PARTS) for (const slug of p.slugs) partOf[slug] = p;
 const contentsOrder = [...PARTS.flatMap((p) => p.slugs.filter((s) => sections.has(s))), ...order.filter((s) => !partOf[s])];
-const other = order.filter((s) => !partOf[s]);
+const sectionVol = (slug) => sections.get(slug).pageMeta?.[sections.get(slug).pages[0]]?.vol ?? 1;
+const other = order.filter((s) => !partOf[s] && sectionVol(s) === 1);
+const laterSections = order.filter((s) => !partOf[s] && sectionVol(s) > 1);
 const parts = [...PARTS, ...(other.length ? [{ title: 'Other Tables', blurb: '', slugs: other }] : [])];
 
 function tocLinks(slugs, active) {
@@ -369,7 +399,7 @@ contentsOrder.forEach((slug, i) => {
   const s = sections.get(slug);
   const prev = contentsOrder[i - 1], next = contentsOrder[i + 1];
   const part = partOf[slug];
-  const printed = s.pages.map(VOLUME.pdfToPrinted);
+  const printed = s.pages.map((pdf) => s.pageMeta?.[pdf]?.printed).filter((n) => n);
   const pageRange = printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : `p. ${printed[0]}`;
   const body = `
 <article class="section${GLOSSARIES.has(slug) ? ' glossary' : ''}" data-slug="${slug}">
@@ -387,6 +417,25 @@ contentsOrder.forEach((slug, i) => {
   fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title: s.title, body, active: slug }));
 });
 
+for (const slug of laterSections) {
+  const s = sections.get(slug);
+  const vol = sectionVol(slug);
+  const printed = s.pages.map((pdf) => s.pageMeta?.[pdf]?.printed).filter((n) => n);
+  const pageRange = printed.length > 1 ? `pp. ${printed[0]}–${printed.at(-1)}` : printed.length ? `p. ${printed[0]}` : 'plate';
+  const body = `
+<article class="section" data-slug="${slug}">
+  <p class="eyebrow">Volume ${ROMAN[vol]}</p>
+  <h1>${s.title}</h1>
+  <p class="source">Vol. ${ROMAN[vol]}, ${pageRange}</p>
+  ${rendered.get(slug)}
+  <nav class="pager" aria-label="Previous and next">
+    <a class="prev" href="index.html#volume-${vol}"><span>Previous</span>Volume ${ROMAN[vol]}</a>
+    <span></span>
+  </nav>
+</article>`;
+  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title: s.title, body, toc: annotatedToc(slug, 0) }));
+}
+
 // ---------- Genesis pages ----------
 const extraTitles = {}; // slug → title, for search, backlinks and proofing
 const inline = (md) => marked.parseInline(md, { gfm: true })
@@ -395,7 +444,8 @@ const inline = (md) => marked.parseInline(md, { gfm: true })
 
 function chapterCells(book, activeChapter) {
   const cells = [];
-  for (let n = 1; n <= book.meta.chapters; n++) {
+  const start = book.meta.chapterStart ?? 1;
+  for (let n = start; n <= book.meta.chapters; n++) {
     const on = activeChapter === n;
     cells.push(book.parsed.chapters.get(n)?.verses.size
       ? `<a href="${book.meta.slug}-${n}.html"${on ? ' aria-current="page"' : ''}>${n}</a>`
@@ -404,17 +454,45 @@ function chapterCells(book, activeChapter) {
   return cells.join('');
 }
 
+function bookToc(book, activeSlug, activeChapter) {
+  const onBook = book.meta.slug === activeSlug;
+  return `<div class="toc-part"><p class="toc-head"><a href="${book.meta.slug}.html"${onBook && activeChapter === 0 ? ' aria-current="page"' : ''}>${book.meta.name}</a></p><div class="ch-grid">${chapterCells(book, onBook ? activeChapter : 0)}</div></div>`;
+}
+
 function annotatedToc(activeSlug, activeChapter) {
-  const vols = [...new Set(books.map((b) => b.vol))].sort();
-  const parts = vols.map((v) => {
-    const list = books.filter((b) => b.vol === v).map((book) => {
-      const onBook = book.meta.slug === activeSlug;
-      return `<div class="toc-part"><p class="toc-head"><a href="${book.meta.slug}.html"${onBook && activeChapter === 0 ? ' aria-current="page"' : ''}>${book.meta.name}</a></p><div class="ch-grid">${chapterCells(book, onBook ? activeChapter : 0)}</div></div>`;
+  const bySlug = Object.fromEntries(books.map((b) => [b.meta.slug, b]));
+  const present = new Set(books.map((b) => b.vol));
+  const listed = new Set();
+  const parts = [];
+  for (const vol of VOLUMES) {
+    const v = ROMAN.indexOf(vol.roman);
+    if (!present.has(v)) continue;
+    const main = (vol.books || []).map((item) => {
+      const book = item.slug && bySlug[item.slug];
+      if (!book) return '';
+      listed.add(item.slug);
+      return bookToc(book, activeSlug, activeChapter);
     }).join('\n');
+    const extra = (vol.extras || []).map((g) => {
+      const items = g.books.map((item) => {
+        if (item.section && sections.has(item.section)) {
+          const on = item.section === activeSlug;
+          return `<div class="toc-part"><p class="toc-head"><a href="${item.section}.html"${on ? ' aria-current="page"' : ''}>${item.name}</a></p></div>`;
+        }
+        const book = item.slug && bySlug[item.slug];
+        if (!book) return '';
+        listed.add(item.slug);
+        return bookToc(book, activeSlug, activeChapter);
+      }).join('\n');
+      if (!items.trim()) return '';
+      return `<div class="toc-part"><p class="toc-head">${g.title}</p></div>\n${items}`;
+    }).join('\n');
+    const rest = books.filter((b) => b.vol === v && !listed.has(b.meta.slug)).map((b) => bookToc(b, activeSlug, activeChapter)).join('\n');
     const aids = v === 1 ? '\n<div class="toc-part"><p class="toc-head"><a href="index.html#before-genesis">Before Genesis</a></p></div>' : '';
-    return `<div class="toc-part"><p class="toc-head">Volume ${ROMAN[v]}</p></div>\n${list}${aids}`;
-  });
-  const next = Math.max(...vols) + 1;
+    const head = `<div class="toc-part"><p class="toc-head">Volume ${vol.roman}</p></div>`;
+    parts.push(vol.extrasFirst ? `${head}\n${extra}\n${main}${aids}\n${rest}` : `${head}\n${main}${aids}\n${rest}\n${extra}`);
+  }
+  const next = Math.max(...present, 0) + 1;
   if (next <= 4) parts.push(`<div class="toc-part"><p class="toc-head"><a href="index.html#volume-${next}">${next < 4 ? `Volumes ${ROMAN[next]} to IV` : 'Volume IV'}</a></p></div>`);
   return parts.join('\n');
 }
@@ -464,10 +542,22 @@ function renderAnnotatedChapter(book, n) {
   const verses = [...ch.verses.values()].sort((a, b) => a.v - b.v).map((vs) => {
     const vid = `v${n}-${vs.v}`;
     const keysSeen = {};
-    const text = escapeHtml(vs.text)
+    // A pilcrow in Ecclesiasticus is a margin key. Elsewhere it only marks a paragraph.
+    const hasPilcrowKey = vs.margin.some((e) => e.key === '¶');
+    let pilcrowLinked = false;
+    const text = restoreSmallCaps(escapeHtml(vs.text))
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(/¶\s*/g, '<span class="pilcrow" aria-hidden="true">¶</span> ')
-      .replace(/\{([a-z0-9*†‡§]{1,3})\}|\^([a-z0-9*†‡§]+)/gi, (m, k1, k2) => {
+      .replace(/¶\s*/g, (m) => {
+        if (hasPilcrowKey && !pilcrowLinked) {
+          pilcrowLinked = true;
+          const k = '¶';
+          keysSeen[k] = 1;
+          const id = `m${n}-${vs.v}-${k}`;
+          return `<sup class="key"><a href="#${id}">${k}</a></sup>${/\s/.test(m) ? ' ' : ''}`;
+        }
+        return '<span class="pilcrow" aria-hidden="true">¶</span> ';
+      })
+      .replace(/\{([a-z0-9*†‡§|]{1,3})\}|\^([a-z0-9*†‡§|]+)/gi, (m, k1, k2) => {
         const k = k1 || k2;
         keysSeen[k] = (keysSeen[k] || 0) + 1;
         const id = `m${n}-${vs.v}-${k}${keysSeen[k] > 1 ? `-${keysSeen[k]}` : ''}`;
@@ -496,13 +586,7 @@ function renderAnnotatedChapter(book, n) {
       const label = `Vol. ${ROMAN[book.vol]}, p. ${printedOf(book, vs.pdf)}`;
       marker = `<div class="page-marker"><span>${label}</span><button type="button" class="scan-btn" data-scan="${scanDir(book.vol)}/pdf${pad3(vs.pdf)}.png" data-label="${label}">View page scan</button></div>`;
     }
-    const plates = book.parsed.plates.filter((pl) => pl.after?.c === n && pl.after?.v === vs.v).map((pl) => {
-      // "TITLE. [Genesis, xiii:3.]—Description…": set the title apart from the description.
-      const cut = pl.caption.search(/\]\s*[—.-]*/);
-      const title = cut > 0 ? pl.caption.slice(0, pl.caption.indexOf(']', cut) + 1) : pl.caption.split(/(?<=\.)\s/)[0];
-      const rest = pl.caption.slice(title.length).replace(/^[\s—.-]+/, '');
-      return `<figure class="plate"><button type="button" class="scan-btn plate-btn" data-scan="${scanDir(book.vol)}/plate-pdf${pl.pdf}.jpg" data-label="${escapeHtml(title)}" aria-label="Enlarge: ${escapeHtml(title)}"><img src="${scanDir(book.vol)}/thumb-pdf${pl.pdf}.jpg" alt="${escapeHtml(title)}" loading="lazy"></button><figcaption><b>${escapeHtml(title)}</b>${rest ? ` ${escapeHtml(rest)}` : ''}</figcaption></figure>`;
-    }).join('');
+    const plates = book.parsed.plates.filter((pl) => pl.after?.c === n && pl.after?.v === vs.v).map((pl) => plateFigure(book.vol, pl)).join('');
     return `${marker}<div class="verse" id="${vid}"${srcAttr(vs.src)}><p class="vt">${num} ${annotateMeasures(text)}</p>${margin ? `<div class="vm">${margin}</div>` : ''}</div>${plates}`;
   });
   const loose = ch.margin.map((e) => `${e.date ? marginDate(e.date) : ''}<p class="ment"${srcAttr(e.src)}><b>${escapeHtml(e.key)}</b> ${linker.linkHtml(inline(e.text))}${e.v ? ` <span class="muted">(ver. ${e.v})</span>` : ''}</p>`).join('');
@@ -520,7 +604,7 @@ function renderAnnotatedChapter(book, n) {
   <div class="chapter-tools"><label><input type="checkbox" id="show-margin" checked> Margin references</label>${hasConv ? '<label><input type="checkbox" id="show-conv" checked> Modern measures</label>' : ''}${ch.notes.length ? `<a href="#notes">Notes ↓</a>` : ''}</div>
   ${ch.title ? `<p class="ps-title"${srcAttr(ch.title.src)}>${linker.linkHtml(inline(ch.title.text))
     // Keys in a psalm's title point at margin entries filed under verse 1.
-    .replace(/\{([a-z0-9*†‡§]{1,3})\}/gi, (m, k) => `<sup class="key"><a href="#m${n}-1-${k}">${k}</a></sup>`)}</p>` : ''}
+    .replace(/\{([a-z0-9*†‡§|]{1,3})\}/gi, (m, k) => `<sup class="key"><a href="#m${n}-1-${k}">${k}</a></sup>`)}</p>` : ''}
   <div class="scripture">${verses.join('\n')}</div>
   ${loose ? `<aside class="loose-margin"><h2>Other margin entries</h2>${loose}</aside>` : ''}
   ${ch.notes.length ? `<section class="notes" id="notes"><h2>Notes</h2>${notes.join('\n')}</section>` : ''}
@@ -536,11 +620,13 @@ function renderAnnotatedChapter(book, n) {
 for (const book of books) {
   for (const n of book.chapters) renderAnnotatedChapter(book, n);
   extraTitles[book.meta.slug] = book.meta.name;
+  const hasNotes = [...book.parsed.chapters.values()].some((ch) => ch.notes.length);
+  const credit = hasNotes ? 'With John Brown’s marginal references, notes and reflections' : 'With the marginal references';
   const introBody = `
 <article class="section">
   <p class="eyebrow">Volume ${ROMAN[book.vol]}</p>
   <h1>${escapeHtml(book.parsed.title || book.meta.name)}</h1>
-  <p class="source">With John Brown’s marginal references, notes and reflections · Vol. ${ROMAN[book.vol]}, p. ${printedOf(book, book.parsed.pages[0])}</p>
+  <p class="source">${credit} · Vol. ${ROMAN[book.vol]}, p. ${printedOf(book, book.parsed.pages[0])}</p>
   ${book.parsed.intro.map((p) => `<p${srcAttr(p.src)}>${linker.linkHtml(inline(p.text))}</p>`).join('\n')}
   <h2>Chapters</h2>
   <div class="ch-grid big">${chapterCells(book, 0)}</div>
@@ -553,6 +639,7 @@ const totalRefs = Object.values(backlinks).reduce((a, l) => a + l.length, 0);
 
 function nameList(items, live) {
   return `<ul class="name-list">${items.map((b) => {
+    if (b.section && sections.has(b.section)) return `<li><a href="${b.section}.html">${b.name}</a></li>`;
     const on = live && b.slug && books.some((book) => book.meta.slug === b.slug);
     return on
       ? `<li><a href="${b.slug}.html">${b.name}</a></li>`
@@ -604,13 +691,22 @@ ${parts.map(aidLists).join('\n')}
   </div>
 </section>`;
   }
-  const grids = books.some((b) => b.vol === volN)
-    ? books.filter((b) => b.vol === volN).map((book) => `<section class="book-block">
+  const listed = new Set((vol.books || []).map((b) => b.slug).filter(Boolean));
+  const grids = books.filter((b) => b.vol === volN && listed.has(b.meta.slug)).map((book) => `<section class="book-block">
     <h4><a href="${book.meta.slug}.html">${book.meta.name}</a></h4>
     <div class="ch-grid big">${chapterCells(book, 0)}</div>
-  </section>`).join('\n')
-    : '';
-  const extras = (vol.extras || []).map((g) => `<h3>${g.title}</h3>${nameList(g.books, false)}`).join('\n');
+  </section>`).join('\n');
+  const extras = (vol.extras || []).map((g) => {
+    const blocks = g.books.map((item) => {
+      const book = books.find((b) => b.meta.slug === item.slug);
+      if (!book) return '';
+      return `<section class="book-block">
+    <h4><a href="${book.meta.slug}.html">${item.name}</a></h4>
+    <div class="ch-grid big">${chapterCells(book, 0)}</div>
+  </section>`;
+    }).join('\n');
+    return `<h3>${g.title}</h3>${nameList(g.books, true)}${blocks}`;
+  }).join('\n');
   const bookHtml = `<h3 id="${vol.id}-text">The text</h3>
   ${nameList(vol.books, true)}
   ${grids}`;

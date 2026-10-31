@@ -6,8 +6,11 @@ for (const dir of process.argv.slice(2)) {
   for (const f of fs.readdirSync(dir).filter((f) => /^pdf\d+\.md$/.test(f)).sort()) {
     const src = fs.readFileSync(`${dir}/${f}`, 'utf8');
     if (!/<!--\s*text\s*-->/.test(src)) continue;
+    // Apocrypha pages carry this marker. They have a margin and no notes block.
+    const noNotes = /<!--\s*layout:\s*no-notes\s*-->/.test(src);
     const empty = [];
     for (const kind of ['text', 'margin', 'notes']) {
+      if (kind === 'notes' && noNotes) continue;
       // A page can have several blocks of one kind (a text block per chapter); one with content is enough.
       const blocks = [...src.matchAll(new RegExp(`<!--\\s*${kind}\\s*-->([\\s\\S]*?)(?=<!--\\s*(?:text|margin|notes|summary|intro)\\s*-->|<!--\\s*chapter:|$)`, 'g'))];
       const body = blocks.map((m) => m[1].replace(/<!--[\s\S]*?-->/g, '').trim()).join('');

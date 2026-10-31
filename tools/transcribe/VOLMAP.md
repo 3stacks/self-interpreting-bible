@@ -48,7 +48,7 @@ Haggai: 342-346 (starts part-way down page 342, shared with the end of Zephaniah
 Zechariah: 346-365 (starts part-way down page 346, shared with the end of Haggai), ends part-way down 365
 Malachi: 365-370 (starts part-way down page 365, shared with the end of Zechariah), ends 370 (short page)
 other: A Brief Outline of the History of the Principal Prophetic Kingdoms of the East 372-374 (starts top of 372; map plate 371 before it)
-Apocrypha (two-column text, no commentary columns):
+Apocrypha (two text columns, a centre margin of dates and references, no notes block):
 1 Esdras: 375-383 (page 375 has the APOCRYPHA title, then 1 Esdras at the top), ends part-way down 383
 2 Esdras: 383-398 (starts part-way down page 383), ends part-way down 398
 Tobit: 398-403 (starts part-way down page 398), ends part-way down 403
