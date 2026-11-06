@@ -81,6 +81,16 @@ The workflow file holds the Cloudflare account ID, because the ID is not secret.
 
 Without the secret, the workflow builds the site and skips the deploy.
 
+## Links to Catechize
+
+Under each verse, the site lists the catechism and confession answers that cite the verse as a proof
+text. Each answer links to [Catechize](https://catechize.pages.dev), where a reader can learn it.
+
+- `node tools/fetch-catechize.mjs` gets the list from `/app/data/cited.json` on Catechize. It
+  writes the list to `data/catechize-cited.json`. Git ignores that file.
+- CI runs the script before each build. If Catechize is not reachable, the build shows no list.
+- Catechize links back to each verse that is online here. It reads `backlinks.json`.
+
 ## Adding pages
 
 1. Extract the scans: `pymupdf` `page.get_images()[0]` → `scans/pdfNNN.png`.

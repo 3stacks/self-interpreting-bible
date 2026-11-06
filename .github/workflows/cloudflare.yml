@@ -33,6 +33,8 @@ jobs:
       # The build turns the page scans upright with ImageMagick's `convert`.
       - run: command -v convert || (sudo apt-get update && sudo apt-get install -y imagemagick)
       - run: npm ci
+      # Link each verse to the catechism answers that cite it. If Catechize is not reachable, the site shows no citations.
+      - run: node tools/fetch-catechize.mjs
       - run: node build.mjs
       # Create the Pages project on the first run. Later runs find it and go on.
       - if: env.CLOUDFLARE_API_TOKEN != ''

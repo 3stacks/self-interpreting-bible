@@ -389,6 +389,27 @@ const CONFIG = fs.existsSync(path.join(ROOT, 'site.config.json')) ? JSON.parse(f
 // The proofing tools (the Proofing list, Edit mode and the ✎ buttons) are for local work only.
 // serve.mjs builds with SIB_PROOFING=1. A plain build, such as the deploy build, leaves them out.
 const PROOFING = process.env.SIB_PROOFING === '1';
+
+// ---------- Catechize ----------
+// data/catechize-cited.json maps each verse to the catechism and confession answers that cite it
+// as a proof text (tools/fetch-catechize.mjs). Each verse links to those answers in Catechize.
+const CATECHIZE = process.env.CATECHIZE_URL ?? 'https://catechize.pages.dev';
+const citedPath = path.join(ROOT, 'data/catechize-cited.json');
+const cited = fs.existsSync(citedPath) ? JSON.parse(fs.readFileSync(citedPath, 'utf8')) : { units: {}, verses: {} };
+function citedHtml(key) {
+  const ids = cited.verses[key];
+  if (!ids?.length) return '';
+  const byDoc = new Map(); // doc short name → links, in Catechize's document order
+  for (const id of ids) {
+    const [doc, label] = cited.units[id];
+    const sp = label.indexOf(' ');
+    const short = label.slice(0, sp);
+    const link = `<a href="${CATECHIZE}/app/#/unit/${doc}/${encodeURIComponent(id)}" title="Open ${escapeHtml(label)} in Catechize">${escapeHtml(label.slice(sp + 1))}</a>`;
+    (byDoc.get(short) ?? byDoc.set(short, []).get(short)).push(link);
+  }
+  const groups = [...byDoc].map(([short, links]) => `${short} ${links.join(', ')}`).join(' · ');
+  return `<span class="cited"><span class="cited-label">Cited in</span> ${groups}</span>`;
+}
 const REPO = PROOFING ? process.env.GITHUB_REPOSITORY || CONFIG.repo || '' : '';
 const BRANCH = process.env.GITHUB_REF_NAME || CONFIG.branch || 'main';
 
@@ -588,7 +609,7 @@ function renderAnnotatedChapter(book, n) {
       marker = `<div class="page-marker"><span>${label}</span><button type="button" class="scan-btn" data-scan="${scanDir(book.vol)}/pdf${pad3(vs.pdf)}.png" data-label="${label}">View page scan</button></div>`;
     }
     const plates = book.parsed.plates.filter((pl) => pl.after?.c === n && pl.after?.v === vs.v).map((pl) => plateFigure(book.vol, pl)).join('');
-    return `${marker}<div class="verse" id="${vid}"${srcAttr(vs.src)}><p class="vt">${num} ${annotateMeasures(text)}</p>${margin ? `<div class="vm">${margin}</div>` : ''}</div>${plates}`;
+    return `${marker}<div class="verse" id="${vid}"${srcAttr(vs.src)}><p class="vt">${num} ${annotateMeasures(text)}${citedHtml(`${book.meta.code}.${n}.${vs.v}`)}</p>${margin ? `<div class="vm">${margin}</div>` : ''}</div>${plates}`;
   });
   const loose = ch.margin.map((e) => `${e.date ? marginDate(e.date) : ''}<p class="ment"${srcAttr(e.src)}><b>${escapeHtml(e.key)}</b> ${linker.linkHtml(inline(e.text))}${e.v ? ` <span class="muted">(ver. ${e.v})</span>` : ''}</p>`).join('');
 

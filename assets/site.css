@@ -280,6 +280,11 @@ a.ref:hover { text-decoration-style: solid; }
 .verse { display: grid; grid-template-columns: minmax(0, var(--measure)) minmax(0, 18rem); gap: 0 2rem; padding-block: 0.2rem; scroll-margin-top: 5rem; }
 .verse:target .vt { background: var(--hl); }
 .vt { margin: 0; font-size: 1.12rem; line-height: 1.7; }
+.cited { display: block; font: 400 0.75rem/1.5 var(--f-ui); color: var(--muted); margin: 0.1rem 0 0.3rem; }
+.cited-label { font-weight: 500; letter-spacing: 0.04em; }
+.cited a { color: var(--accent); text-decoration: none; }
+.cited a:hover { text-decoration: underline; }
+.scripture.no-margin .cited { display: none; }
 .vn { font: 500 0.78rem var(--f-ui); color: var(--rubric); text-decoration: none; margin-right: 0.15rem; vertical-align: 0.15em; }
 .vn.has-note { border-bottom: 1px dotted var(--rubric); }
 .vn.has-note::after { content: " ✎"; font-size: 0.7rem; }

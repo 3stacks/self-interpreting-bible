@@ -2,3 +2,4 @@ node_modules/
 build/
 artifact-index.html
 .local/
+data/catechize-cited.json
