@@ -224,7 +224,8 @@
         return `<li><a href="${slug}.html#${id}">${esc(index.titles[slug])}</a><p>${esc(snip).replace(re, '<mark>$1</mark>')}</p></li>`;
       }).join('');
     }
-    input.value = store.get('sib:q') || '';
+    // search?q=word opens with that search (the homepage tells search engines about this address).
+    input.value = new URLSearchParams(location.search).get('q') || store.get('sib:q') || '';
     input.addEventListener('input', run);
     $('#search-form').addEventListener('submit', (e) => e.preventDefault());
   }

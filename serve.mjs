@@ -26,6 +26,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
+  '.webp': 'image/webp', '.woff2': 'font/woff2', '.xml': 'application/xml', '.txt': 'text/plain; charset=utf-8',
 };
 
 // Only transcription pages can be edited: "pdf033.md" or "genesis/pdf214.md".
@@ -119,6 +120,8 @@ async function api(req, res, url) {
 function serveStatic(req, res, url) {
   let rel = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html';
   if (rel.endsWith('/')) rel += 'index.html';
+  // Serve "/genesis-1" from genesis-1.html, as Cloudflare Pages does.
+  if (!path.extname(rel) && fs.existsSync(path.join(BUILD, `${rel}.html`))) rel += '.html';
   const file = path.join(BUILD, rel);
   if (!file.startsWith(BUILD + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     res.writeHead(404, { 'content-type': 'text/plain' });
@@ -135,7 +138,8 @@ function handler(req, res) {
 }
 
 // Rebuild when there is no build, or when the build has no proofing tools (a deploy build).
-const index = path.join(BUILD, 'index.html');
+// contents.html, because the homepage from site/ can replace index.html.
+const index = path.join(BUILD, 'contents.html');
 if (!fs.existsSync(index) || !fs.readFileSync(index, 'utf8').includes('id="edit-toggle"')) {
   execFileSync(process.execPath, ['build.mjs'], { cwd: ROOT, env: BUILD_ENV, stdio: 'inherit' });
 }

@@ -330,11 +330,11 @@ function tocLinks(slugs, active) {
 
 function sidebar(active) {
   const jump = `<div class="toc-part"><p class="toc-head">Volumes</p><ul>
-    <li><a href="index.html#volume-1">Volume I</a></li>
-    <li><a href="index.html#before-genesis">Before Genesis</a></li>
-    <li><a href="index.html#volume-2">Volume II</a></li>
-    <li><a href="index.html#volume-3">Volume III</a></li>
-    <li><a href="index.html#volume-4">Volume IV</a></li>
+    <li><a href="contents.html#volume-1">Volume I</a></li>
+    <li><a href="contents.html#before-genesis">Before Genesis</a></li>
+    <li><a href="contents.html#volume-2">Volume II</a></li>
+    <li><a href="contents.html#volume-3">Volume III</a></li>
+    <li><a href="contents.html#volume-4">Volume IV</a></li>
   </ul></div>`;
   const groups = parts.map((p) => {
     const body = p.groups
@@ -349,7 +349,7 @@ function sidebar(active) {
   return jump + groups;
 }
 
-function layout({ title, body, active = '', bodyClass = '', withToc = true, toc = null, head = '' }) {
+function layout({ title, body, active = '', bodyClass = '', withToc = true, toc = null, head = '', page = null, description = '', crumbs = [], noindex = false, docTitle = '' }) {
   return `<!doctype html>
 <html lang="en-GB" data-era="am"${REPO ? ` data-repo="${REPO}" data-branch="${BRANCH}"` : ''}>
 <head>
@@ -358,7 +358,8 @@ function layout({ title, body, active = '', bodyClass = '', withToc = true, toc 
 <script>try{if(localStorage.getItem("sib:era")==="bc")document.documentElement.dataset.era="bc"}catch(e){}</script>
 ${head}
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${title === SITE ? SITE : `${stripTags(title)} · ${SITE}`}</title>
+<title>${escapeAttr(docTitle || (title === SITE ? SITE : `${stripTags(title)} · ${SITE}`))}</title>
+${seoHead({ title: docTitle || stripTags(title), body, page, description, crumbs, noindex })}
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -368,10 +369,10 @@ ${head}
 <body class="${bodyClass}">
 <header class="masthead">
   <div class="masthead-inner">
-    <a class="brand" href="index.html"><span class="brand-sc">The Self-Interpreting Bible</span><span class="brand-sub">John Brown of Haddington</span></a>
+    <a class="brand" href="/"><span class="brand-sc">The Self-Interpreting Bible</span><span class="brand-sub">John Brown of Haddington</span></a>
     <nav class="topnav" aria-label="Site">
       ${withToc ? '<button type="button" class="toc-toggle" aria-expanded="false" aria-controls="toc">Contents</button>' : ''}
-      <a href="index.html">Contents</a>
+      <a href="contents.html">Contents</a>
       <a href="bible.html">Bible</a>
       <a href="search.html">Search</a>
       <a href="https://ko-fi.com/lukeboyle">Ko-fi</a>
@@ -406,6 +407,71 @@ ${PROOFING ? `<dialog class="fix-dialog" id="fix-dialog">
 `;
 }
 const SITE = 'The Self-Interpreting Bible';
+
+// ---------- Search engines and link previews ----------
+// The public address. Cloudflare Pages serves "genesis-1.html" at "/genesis-1", so canonical URLs have no ".html".
+const SITE_URL = (process.env.SITE_URL ?? 'https://haddingtonbible.org').replace(/\/+$/, '');
+const DEFAULT_DESCRIPTION = 'John Brown of Haddington’s Self-Interpreting Bible, free online: the King James text with the margin references, notes and reflections, transcribed from the four-volume edition.';
+const escapeAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Cut a description to the length that search results show, at a word break.
+function clip(text, n = 160) {
+  text = text.replace(/\s+/g, ' ').trim();
+  if (text.length <= n) return text;
+  const cut = text.slice(0, n - 1);
+  return `${cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:.(–—-]+$/, '')}…`;
+}
+// The chapter summary, or else the first real paragraph of the page.
+function autoDescription(body) {
+  const summary = body.match(/<p class="summary"[^>]*>([\s\S]*?)<\/p>/)?.[1];
+  if (summary) return stripTags(summary);
+  for (const m of body.matchAll(/<p(\s[^>]*)?>([\s\S]*?)<\/p>/g)) {
+    if (/class="(eyebrow|source|conv-note|volume-note|group-label|part-blurb|colophon)/.test(m[1] || '')) continue;
+    const t = stripTags(m[2]);
+    if (t.length > 50) return t;
+  }
+  return '';
+}
+const jsonLd = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
+function seoHead({ title, body, page, description, crumbs, noindex }) {
+  const url = page === null ? null : `${SITE_URL}/${page}`;
+  const desc = clip(description || autoDescription(body) || DEFAULT_DESCRIPTION);
+  const tags = [
+    `<meta name="description" content="${escapeAttr(desc)}">`,
+    noindex ? '<meta name="robots" content="noindex, follow">' : '',
+    url ? `<link rel="canonical" href="${url}">` : '',
+    '<meta name="theme-color" content="#27407a">',
+    '<link rel="icon" href="/icon.svg" type="image/svg+xml">',
+    `<meta property="og:site_name" content="${SITE}">`,
+    `<meta property="og:title" content="${escapeAttr(title)}">`,
+    `<meta property="og:description" content="${escapeAttr(desc)}">`,
+    '<meta property="og:type" content="article">',
+    '<meta property="og:locale" content="en_GB">',
+    url ? `<meta property="og:url" content="${url}">` : '',
+    `<meta property="og:image" content="${SITE_URL}/og.png">`,
+    '<meta property="og:image:width" content="1200">',
+    '<meta property="og:image:height" content="630">',
+    `<meta property="og:image:alt" content="${SITE}, by John Brown of Haddington">`,
+    '<meta name="twitter:card" content="summary_large_image">',
+  ];
+  if (url && !noindex) {
+    const trail = [[SITE, `${SITE_URL}/`], ...crumbs.map(([name, p]) => [name, `${SITE_URL}/${p}`]), [title, url]];
+    tags.push(jsonLd({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'WebPage', '@id': url, url, name: title, description: desc, inLanguage: 'en-GB',
+          isPartOf: { '@id': `${SITE_URL}/#website` }, about: { '@id': `${SITE_URL}/#book` },
+          breadcrumb: { '@id': `${url}#breadcrumb` },
+        },
+        {
+          '@type': 'BreadcrumbList', '@id': `${url}#breadcrumb`,
+          itemListElement: trail.map(([name, item], i) => ({ '@type': 'ListItem', position: i + 1, name: stripTags(name), item })),
+        },
+      ],
+    }));
+  }
+  return tags.filter(Boolean).join('\n');
+}
 // Where the transcriptions live on GitHub, for "correct this" links on a static host.
 // In GitHub Actions these come from the run; locally from site.config.json if present.
 const CONFIG = fs.existsSync(path.join(ROOT, 'site.config.json')) ? JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8')) : {};
@@ -459,7 +525,7 @@ contentsOrder.forEach((slug, i) => {
     ${next ? `<a class="next" href="${next}.html"><span>Next</span>${sections.get(next).title}</a>` : '<span></span>'}
   </nav>
 </article>`;
-  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title: s.title, body, active: slug }));
+  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title: s.title, body, active: slug, page: slug, crumbs: [['Contents', 'contents']] }));
 });
 
 for (const slug of laterSections) {
@@ -474,11 +540,11 @@ for (const slug of laterSections) {
   <p class="source">Vol. ${ROMAN[vol]}, ${pageRange}</p>
   ${rendered.get(slug)}
   <nav class="pager" aria-label="Previous and next">
-    <a class="prev" href="index.html#volume-${vol}"><span>Previous</span>Volume ${ROMAN[vol]}</a>
+    <a class="prev" href="contents.html#volume-${vol}"><span>Previous</span>Volume ${ROMAN[vol]}</a>
     <span></span>
   </nav>
 </article>`;
-  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title: s.title, body, toc: annotatedToc(slug, 0) }));
+  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title: s.title, body, toc: annotatedToc(slug, 0), page: slug, crumbs: [['Contents', 'contents']] }));
 }
 
 // ---------- Genesis pages ----------
@@ -533,12 +599,12 @@ function annotatedToc(activeSlug, activeChapter) {
       return `<div class="toc-part"><p class="toc-head">${g.title}</p></div>\n${items}`;
     }).join('\n');
     const rest = books.filter((b) => b.vol === v && !listed.has(b.meta.slug)).map((b) => bookToc(b, activeSlug, activeChapter)).join('\n');
-    const aids = v === 1 ? '\n<div class="toc-part"><p class="toc-head"><a href="index.html#before-genesis">Before Genesis</a></p></div>' : '';
+    const aids = v === 1 ? '\n<div class="toc-part"><p class="toc-head"><a href="contents.html#before-genesis">Before Genesis</a></p></div>' : '';
     const head = `<div class="toc-part"><p class="toc-head">Volume ${vol.roman}</p></div>`;
     parts.push(vol.extrasFirst ? `${head}\n${extra}\n${main}${aids}\n${rest}` : `${head}\n${main}${aids}\n${rest}\n${extra}`);
   }
   const next = Math.max(...present, 0) + 1;
-  if (next <= 4) parts.push(`<div class="toc-part"><p class="toc-head"><a href="index.html#volume-${next}">${next < 4 ? `Volumes ${ROMAN[next]} to IV` : 'Volume IV'}</a></p></div>`);
+  if (next <= 4) parts.push(`<div class="toc-part"><p class="toc-head"><a href="contents.html#volume-${next}">${next < 4 ? `Volumes ${ROMAN[next]} to IV` : 'Volume IV'}</a></p></div>`);
   return parts.join('\n');
 }
 
@@ -660,7 +726,13 @@ function renderAnnotatedChapter(book, n) {
     ${next ? `<a class="next" href="${book.meta.slug}-${next}.html"><span>Next</span>${chName} ${next}</a>` : '<span></span>'}
   </nav>
 </article>`;
-  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title, body, toc: annotatedToc(book.meta.slug, n), bodyClass: 'annotated' }));
+  const extras = ch.notes.length ? 'margin references, notes and reflections' : 'margin references';
+  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({
+    title, body, toc: annotatedToc(book.meta.slug, n), bodyClass: 'annotated', page: slug,
+    crumbs: [['Contents', 'contents'], [book.meta.name, book.meta.slug]],
+    docTitle: ch.notes.length ? `${title} commentary and notes · ${SITE}` : '',
+    description: `${title} (KJV) with John Brown’s ${extras}. ${ch.summary ? stripTags(inline(ch.summary.text)) : ''}`,
+  }));
 }
 
 for (const book of books) {
@@ -677,7 +749,7 @@ for (const book of books) {
   <h2>Chapters</h2>
   <div class="ch-grid big">${chapterCells(book, 0)}</div>
 </article>`;
-  fs.writeFileSync(path.join(OUT, `${book.meta.slug}.html`), layout({ title: book.meta.name, body: introBody, toc: annotatedToc(book.meta.slug, 0) }));
+  fs.writeFileSync(path.join(OUT, `${book.meta.slug}.html`), layout({ title: book.meta.name, body: introBody, toc: annotatedToc(book.meta.slug, 0), page: book.meta.slug, crumbs: [['Contents', 'contents']], docTitle: `${book.meta.name}: introduction and chapters · ${SITE}` }));
 }
 
 // ---------- Contents ----------
@@ -785,7 +857,12 @@ const indexBody = `
 ${VOLUMES.map((vol) => volumeBlock(vol)).join('\n')}
 </div>
 <p class="colophon">Scripture text: King James Version (1769). Transcriptions are a first pass from the scanned pages; question marks in the text flag uncertain readings.${PROOFING ? ' See the <a href="proofing.html">proofing list</a>.' : ''} <a href="https://ko-fi.com/lukeboyle">Support this work on Ko-fi</a>.</p>`;
-const indexHtml = layout({ title: SITE, body: indexBody, bodyClass: 'home', withToc: false });
+const indexHtml = layout({
+  title: SITE, body: indexBody, bodyClass: 'home', withToc: false, page: 'contents', docTitle: `Contents · ${SITE}`,
+  description: 'The contents of the Self-Interpreting Bible: every book from Genesis to Revelation, the Apocrypha, the metrical Psalms, and the tables and essays of the four volumes.',
+});
+fs.writeFileSync(path.join(OUT, 'contents.html'), indexHtml);
+// The homepage (site/) replaces this copy when tools/merge-site.mjs runs. Without it, "/" shows the contents.
 fs.writeFileSync(path.join(OUT, 'index.html'), indexHtml);
 // The Artifact host supplies the document skeleton for the main page, so emit a bare-body copy.
 fs.writeFileSync(
@@ -817,7 +894,7 @@ const bibleBody = `
 const annotatedJump = Object.fromEntries(books.map((b) => [b.meta.code, { slug: b.meta.slug, chapters: b.chapters }]));
 const bibleHead = `<script id="annotated-chapters" type="application/json">${JSON.stringify(annotatedJump)}</script>
 <script>try{var map=JSON.parse(document.getElementById("annotated-chapters").textContent);var raw=location.hash.slice(1)||localStorage.getItem("sib:last")||"Gen.1";var parts=decodeURIComponent(raw).split(".");var book=map[parts[0]];var ch=+parts[1]||1;if(book&&book.chapters.indexOf(ch)>=0){var v=+parts[2];location.replace(book.slug+"-"+ch+".html"+(v?"#v"+ch+"-"+v:""))}}catch(e){}</script>`;
-fs.writeFileSync(path.join(OUT, 'bible.html'), layout({ title: 'Bible', body: bibleBody, bodyClass: 'bible', withToc: false, head: bibleHead }));
+fs.writeFileSync(path.join(OUT, 'bible.html'), layout({ title: 'Bible', body: bibleBody, bodyClass: 'bible', withToc: false, head: bibleHead, page: 'bible', noindex: true }));
 
 // ---------- Search ----------
 const searchBody = `
@@ -830,7 +907,7 @@ const searchBody = `
   <p id="search-count" class="search-count"></p>
   <ol id="search-results" class="search-results"></ol>
 </article>`;
-fs.writeFileSync(path.join(OUT, 'search.html'), layout({ title: 'Search', body: searchBody, bodyClass: 'search', withToc: false }));
+fs.writeFileSync(path.join(OUT, 'search.html'), layout({ title: 'Search', body: searchBody, bodyClass: 'search', withToc: false, page: 'search', noindex: true }));
 
 // ---------- Proofing list ----------
 const proofBody = `
@@ -845,7 +922,7 @@ const proofBody = `
   <h2>Unmatched references (${Object.values(rejected).flat().length})</h2>
   <ul class="proof">${Object.entries(rejected).map(([slug, rs]) => `<li><a href="${slug}.html">${sections.get(slug)?.title ?? extraTitles[slug] ?? slug}</a> ${rs.map((r) => `<code>${escapeHtml(r)}</code>`).join(' ')}</li>`).join('')}</ul>
 </article>`;
-if (PROOFING) fs.writeFileSync(path.join(OUT, 'proofing.html'), layout({ title: 'Proofing List', body: proofBody, bodyClass: 'proofing', withToc: false }));
+if (PROOFING) fs.writeFileSync(path.join(OUT, 'proofing.html'), layout({ title: 'Proofing List', body: proofBody, bodyClass: 'proofing', withToc: false, noindex: true }));
 
 // ---------- Data + assets ----------
 const titles = { ...Object.fromEntries(order.map((s) => [s, sections.get(s).title])), ...extraTitles };
@@ -853,7 +930,7 @@ fs.writeFileSync(path.join(OUT, 'search-index.json'), JSON.stringify({ titles, d
 const annotated = Object.fromEntries(books.map((b) => [b.meta.code, b.chapters]));
 const annotatedSlug = Object.fromEntries(books.map((b) => [b.meta.code, b.meta.slug]));
 fs.writeFileSync(path.join(OUT, 'backlinks.json'), JSON.stringify({ titles, refs: backlinks, annotated, annotatedSlug }));
-for (const f of ['site.css', 'site.js']) fs.copyFileSync(path.join(ROOT, 'assets', f), path.join(OUT, f));
+for (const f of ['site.css', 'site.js', 'icon.svg', 'og.png']) fs.copyFileSync(path.join(ROOT, 'assets', f), path.join(OUT, f));
 
 console.log(`books: ${books.map((b) => `${b.meta.name} ${b.chapters.length}`).join(', ') || 'none'}  sections: ${order.length}  refs linked: ${totalRefs}  uncertain: ${unsure.length}  unmatched: ${Object.values(rejected).flat().length}`);
 for (const [slug, rs] of Object.entries(rejected)) console.log(`  unmatched in ${slug}: ${rs.slice(0, 8).join(' | ')}${rs.length > 8 ? ' …' : ''}`);

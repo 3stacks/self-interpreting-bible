@@ -117,6 +117,28 @@ text. Each answer links to [Catechize](https://catechize.pages.dev), where a rea
 - CI runs the script before each build. If Catechize is not reachable, the build shows no list.
 - Catechize links back to each verse that is online here. It reads `backlinks.json`.
 
+## Homepage and search engines
+
+The homepage at `/` is a Next.js site in `site/`. It uses the Primer template of Tailwind Plus, as the Hearers homepage does. The reader contents are at `/contents`.
+
+To build the full site, run these commands:
+
+```bash
+node build.mjs
+npm --prefix site ci
+npm --prefix site run build
+node tools/merge-site.mjs
+```
+
+- `site/` needs Node 20 or later. CI uses Node 22.
+- `tools/merge-site.mjs` copies `site/out/` into `build/`. It then writes `sitemap.xml` and `robots.txt`.
+- The sitemap lists each page that has no `noindex` tag. The search page and the Bible page have that tag.
+- Each reader page has a description, a canonical URL, Open Graph tags and JSON-LD data.
+- Canonical URLs have no `.html`, because Cloudflare Pages serves `genesis-1.html` at `/genesis-1`.
+- `SITE_URL` sets the public address. The default is `https://haddingtonbible.org`.
+- `assets/og.png` is the image for link previews. `assets/icon.svg` is the site icon.
+- The screenshots in `site/src/images/screens/` come from the reader. When the reader design changes, take them again.
+
 ## Public address
 
 The public address is `haddingtonbible.org`.

@@ -5,7 +5,8 @@
   "scripts": {
     "build": "node build.mjs",
     "serve": "node serve.mjs",
-    "check": "node tools/kjvcheck.mjs transcription/*/*.md"
+    "check": "node tools/kjvcheck.mjs transcription/*/*.md",
+    "site": "node build.mjs && npm --prefix site run build && node tools/merge-site.mjs"
   },
   "dependencies": {
     "marked": "^12.0.2"
