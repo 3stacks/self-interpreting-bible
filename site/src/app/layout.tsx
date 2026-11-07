@@ -38,16 +38,6 @@ export const metadata: Metadata = {
   description,
   applicationName: SITE_NAME,
   authors: [{ name: 'Luke Boyle' }],
-  keywords: [
-    'Self-Interpreting Bible',
-    'John Brown of Haddington',
-    'Bible commentary',
-    'King James Version',
-    'margin references',
-    'Reformed commentary',
-    'Scottish Presbyterian',
-    'public domain commentary',
-  ],
   icons: { icon: '/icon.svg' },
   alternates: { canonical: '/' },
   openGraph: {

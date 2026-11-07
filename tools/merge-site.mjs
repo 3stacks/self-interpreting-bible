@@ -27,11 +27,10 @@ const urls = [];
     urls.push(loc);
   }
 })(BUILD, '');
-const priority = (u) => (u === '/' ? '1.0' : u === '/contents' ? '0.9' : /-\d+$/.test(u) ? '0.6' : '0.7');
 urls.sort((a, b) => (a === '/' ? -1 : b === '/' ? 1 : a.localeCompare(b, 'en', { numeric: true })));
 fs.writeFileSync(path.join(BUILD, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map((u) => `  <url><loc>${SITE_URL}${u}</loc><priority>${priority(u)}</priority></url>`).join('\n')}
+${urls.map((u) => `  <url><loc>${SITE_URL}${u}</loc></url>`).join('\n')}
 </urlset>
 `);
 fs.writeFileSync(path.join(BUILD, 'robots.txt'), `User-agent: *

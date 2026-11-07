@@ -544,7 +544,7 @@ for (const slug of laterSections) {
     <span></span>
   </nav>
 </article>`;
-  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title: s.title, body, toc: annotatedToc(slug, 0), page: slug, crumbs: [['Contents', 'contents']] }));
+  fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({ title: s.title, body, toc: annotatedToc(slug, 0), page: slug, crumbs: [['Contents', 'contents']], noindex: slug === 'family-record' }));
 }
 
 // ---------- Genesis pages ----------
@@ -729,9 +729,14 @@ function renderAnnotatedChapter(book, n) {
   const extras = ch.notes.length ? 'margin references, notes and reflections' : 'margin references';
   fs.writeFileSync(path.join(OUT, `${slug}.html`), layout({
     title, body, toc: annotatedToc(book.meta.slug, n), bodyClass: 'annotated', page: slug,
+    // A book with no notes at all (the Apocrypha) is the bare text with references. Readers can open those
+    // chapters, but search engines index only the chapters that carry Brown's own notes.
+    noindex: ![...book.parsed.chapters.values()].some((c) => c.notes.length),
     crumbs: [['Contents', 'contents'], [book.meta.name, book.meta.slug]],
-    docTitle: ch.notes.length ? `${title} commentary and notes · ${SITE}` : '',
-    description: `${title} (KJV) with John Brown’s ${extras}. ${ch.summary ? stripTags(inline(ch.summary.text)) : ''}`,
+    // The printed chapter summary, without its verse numbers, is the description. It is the book's own text.
+    description: ch.summary
+      ? stripTags(inline(ch.summary.text)).replace(/(^|[\s.;,])\d+\s+/g, '$1').replace(/\s+/g, ' ').trim()
+      : `${title}, with John Brown’s ${extras}.`,
   }));
 }
 
@@ -749,7 +754,11 @@ for (const book of books) {
   <h2>Chapters</h2>
   <div class="ch-grid big">${chapterCells(book, 0)}</div>
 </article>`;
-  fs.writeFileSync(path.join(OUT, `${book.meta.slug}.html`), layout({ title: book.meta.name, body: introBody, toc: annotatedToc(book.meta.slug, 0), page: book.meta.slug, crumbs: [['Contents', 'contents']], docTitle: `${book.meta.name}: introduction and chapters · ${SITE}` }));
+  fs.writeFileSync(path.join(OUT, `${book.meta.slug}.html`), layout({
+    title: book.meta.name, body: introBody, toc: annotatedToc(book.meta.slug, 0), page: book.meta.slug, crumbs: [['Contents', 'contents']],
+    // A book with no printed introduction gets only a list of chapters. Search engines do not need that page.
+    noindex: book.parsed.intro.map((p) => p.text).join(' ').split(/\s+/).length < 30,
+  }));
 }
 
 // ---------- Contents ----------

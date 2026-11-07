@@ -1,4 +1,4 @@
-/** The questions on the homepage. The page also gives them to search engines as FAQPage data. */
+/** The questions on the homepage. */
 export const FAQ: { q: string; a: string }[] = [
   {
     q: 'What is the Self-Interpreting Bible?',
@@ -6,7 +6,7 @@ export const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'Who was John Brown of Haddington?',
-    a: 'John Brown (1722–1787) was a Scottish minister and teacher of divinity. He taught himself Latin, Greek and Hebrew as a shepherd boy. He was the minister at Haddington, East Lothian, for 36 years. He also wrote a Dictionary of the Holy Bible and a Concordance.',
+    a: 'John Brown (1722–1787) was a Scottish minister and teacher of divinity. He taught himself Latin, Greek and Hebrew as a shepherd boy. He was the minister at Haddington, East Lothian, for 36 years. He also wrote a Dictionary of the Bible (1769) and a Brief Concordance to the Holy Scriptures (1783).',
   },
   {
     q: 'Is the site free?',

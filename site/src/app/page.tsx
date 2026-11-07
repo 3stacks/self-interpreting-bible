@@ -8,7 +8,6 @@ import { Introduction } from '@/components/Introduction'
 import { NavBar } from '@/components/NavBar'
 import { OnEachPage } from '@/components/OnEachPage'
 import { Questions } from '@/components/Questions'
-import { FAQ } from '@/lib/faq'
 import { JsonLd } from '@/lib/jsonld'
 import { SITE_NAME, SITE_URL, volumes } from '@/lib/site'
 
@@ -24,11 +23,6 @@ const structuredData = {
       alternateName: 'Brown’s Self-Interpreting Bible',
       inLanguage: 'en-GB',
       about: { '@id': `${SITE_URL}/#book` },
-      potentialAction: {
-        '@type': 'SearchAction',
-        target: { '@type': 'EntryPoint', urlTemplate: `${SITE_URL}/search?q={search_term_string}` },
-        'query-input': 'required name=search_term_string',
-      },
     },
     {
       '@type': 'Person',
@@ -59,11 +53,6 @@ const structuredData = {
         url: `${SITE_URL}/contents#${v.id}`,
       })),
       url: `${SITE_URL}/`,
-    },
-    {
-      '@type': 'FAQPage',
-      '@id': `${SITE_URL}/#faq`,
-      mainEntity: FAQ.map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
     },
   ],
 }
