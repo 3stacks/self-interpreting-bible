@@ -81,6 +81,32 @@ The workflow file holds the Cloudflare account ID, because the ID is not secret.
 
 Without the secret, the workflow builds the site and skips the deploy.
 
+## Analytics
+
+The site counts visits with Umami, as hearers.app and lector.dev do. Umami uses no cookies.
+
+- A Pages Function, `functions/a/[[path]].ts`, serves `/a/`. It forwards the tracker and the events
+  to Umami, so the Umami address stays secret. The code is in `functions/_lib/analytics.ts`.
+- `tools/analytics-loader.mjs` holds the loader. `build.mjs` puts it in the `<head>` of each page.
+- The loader loads the tracker after the first input of the visitor.
+- `artifact-index.html` has no loader, because the Artifact host has no `/a/` proxy.
+
+To turn on analytics, set these secrets on the Pages project `self-interpreting-bible`:
+
+```bash
+npx wrangler pages secret put ANALYTICS_FORWARDING_URL --project-name=self-interpreting-bible
+npx wrangler pages secret put ANALYTICS_WEBSITE_ID --project-name=self-interpreting-bible
+```
+
+`ANALYTICS_FORWARDING_URL` is the Umami origin with `https://` and no path. `ANALYTICS_WEBSITE_ID`
+is the UUID of the Umami website for this site. Then run the deploy workflow again.
+
+When analytics is off, `/a/boot.js` names the secret that is empty or not correct.
+
+Analytics counts only `haddingtonbible.org`, `www.haddingtonbible.org` and
+`self-interpreting-bible.pages.dev`. To count another domain, set `ANALYTICS_HOSTS` to a list of
+hosts with commas between them. Branch previews and `localhost` send nothing.
+
 ## Links to Catechize
 
 Under each verse, the site lists the catechism and confession answers that cite the verse as a proof

@@ -11,6 +11,7 @@ import { VOLUMES } from './lib/volumes.mjs';
 import { renderGenealogyChart } from './lib/genealogy.mjs';
 import { parseBook, toRoman } from './lib/genesis.mjs';
 import { ANNOTATED } from './lib/annotated.mjs';
+import { ANALYTICS_LOADER } from './tools/analytics-loader.mjs';
 import { annotateMeasures, annotateMeasuresPage, CONVERSION_NOTE, PAGE_CONVERSION_NOTE } from './lib/measures.mjs';
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
@@ -338,6 +339,7 @@ function layout({ title, body, active = '', bodyClass = '', withToc = true, toc 
 <html lang="en-GB" data-era="am"${REPO ? ` data-repo="${REPO}" data-branch="${BRANCH}"` : ''}>
 <head>
 <meta charset="utf-8">
+<script id="analytics">${ANALYTICS_LOADER}</script>
 <script>try{if(localStorage.getItem("sib:era")==="bc")document.documentElement.dataset.era="bc"}catch(e){}</script>
 ${head}
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -775,6 +777,8 @@ fs.writeFileSync(
   path.join(ROOT, 'artifact-index.html'),
   indexHtml
     .replace(/^<!doctype html>\s*<html[^>]*>\s*<head>\s*<meta charset="utf-8">\s*<meta name="viewport"[^>]*>\s*/, '')
+    // The Artifact host has no /a/ proxy, so leave the analytics loader out.
+    .replace(/<script id="analytics">[\s\S]*?<\/script>\s*/, '')
     .replace(/<\/head>\s*<body[^>]*>/, '')
     .replace(/<\/body>\s*<\/html>\s*$/, ''),
 );
