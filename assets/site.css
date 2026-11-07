@@ -361,3 +361,4 @@ th.conv-col { cursor: help; }
 
 /* A psalm's title, printed above verse 1. */
 .ps-title { font-style: italic; text-align: center; color: var(--muted); margin: 1rem 0 0.5rem; }
+.ch-section { font-size: 0.95rem; font-weight: 600; letter-spacing: 0.12em; text-align: center; color: var(--muted); margin: 1.75rem 0 0.5rem; }

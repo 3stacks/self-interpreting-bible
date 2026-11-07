@@ -37,14 +37,19 @@ fs.writeFileSync(
 );
 
 // ---------- Transcriptions → sections ----------
-const files = fs.readdirSync(path.join(ROOT, 'transcription')).filter((f) => /^pdf\d{3}\.md$/.test(f)).sort();
+// Section pages of Volumes I to III live in transcription/. Volume IV section pages live in transcription/v4/,
+// because their PDF page numbers repeat those of Volume I.
+const sectionFiles = (sub) => fs.existsSync(path.join(ROOT, 'transcription', sub))
+  ? fs.readdirSync(path.join(ROOT, 'transcription', sub)).filter((f) => /^pdf\d{3}\.md$/.test(f)).sort().map((f) => (sub ? `${sub}/${f}` : f))
+  : [];
+const files = [...sectionFiles(''), ...sectionFiles('v4')];
 const sections = new Map(); // slug → { slug, title, pages: [], md: '' }
 const order = [];
 for (const f of files) {
-  const pdf = +f.slice(3, 6);
+  const pdf = +path.basename(f).slice(3, 6);
   const text = fs.readFileSync(path.join(ROOT, 'transcription', f), 'utf8');
   const marks = [...text.matchAll(/<!--\s*(section|continued):\s*([a-z0-9-]+)\s*-->/g)];
-  const vol = +(text.match(/<!--\s*volume:\s*(\d+)\s*-->/)?.[1] || 1);
+  const vol = +(text.match(/<!--\s*volume:\s*(\d+)\s*-->/)?.[1] || (f.startsWith('v4/') ? 4 : 1));
   const printedNum = text.match(/<!--\s*page:\s*\d+\s+printed:\s*(\d+)/)?.[1];
   const printed = printedNum ? +printedNum : (vol === 1 ? pdf - 3 : null);
   marks.forEach((mk, i) => {
@@ -610,7 +615,8 @@ function renderAnnotatedChapter(book, n) {
       marker = `<div class="page-marker"><span>${label}</span><button type="button" class="scan-btn" data-scan="${scanDir(book.vol)}/pdf${pad3(vs.pdf)}.png" data-label="${label}">View page scan</button></div>`;
     }
     const plates = book.parsed.plates.filter((pl) => pl.after?.c === n && pl.after?.v === vs.v).map((pl) => plateFigure(book.vol, pl)).join('');
-    return `${marker}<div class="verse" id="${vid}"${srcAttr(vs.src)}><p class="vt">${num} ${annotateMeasures(text)}${citedHtml(`${book.meta.code}.${n}.${vs.v}`)}</p>${margin ? `<div class="vm">${margin}</div>` : ''}</div>${plates}`;
+    const heading = vs.heading ? `<h2 class="ch-section" id="s${n}-${vs.v}">${escapeHtml(vs.heading)}</h2>` : '';
+    return `${marker}${heading}<div class="verse" id="${vid}"${srcAttr(vs.src)}><p class="vt">${num} ${annotateMeasures(text)}${citedHtml(`${book.meta.code}.${n}.${vs.v}`)}</p>${margin ? `<div class="vm">${margin}</div>` : ''}</div>${plates}`;
   });
   const loose = ch.margin.map((e) => `${e.date ? marginDate(e.date) : ''}<p class="ment"${srcAttr(e.src)}><b>${escapeHtml(e.key)}</b> ${linker.linkHtml(inline(e.text))}${e.v ? ` <span class="muted">(ver. ${e.v})</span>` : ''}</p>`).join('');
 
