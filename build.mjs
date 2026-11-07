@@ -352,6 +352,7 @@ ${head}
       <a href="index.html">Contents</a>
       <a href="bible.html">Bible</a>
       <a href="search.html">Search</a>
+      <a href="https://ko-fi.com/lukeboyle">Ko-fi</a>
       ${PROOFING ? `<a href="proofing.html">Proofing</a>
       <button type="button" id="edit-toggle" class="edit-toggle" aria-pressed="false" hidden title="Show a ✎ on every passage, to correct the transcription">Edit</button>` : ''}
       <span class="era-toggle" role="group" aria-label="Show years as"><button type="button" data-era="am" aria-pressed="true" title="Anno Mundi (A.M.). Years from the Creation.">A.M.</button><button type="button" data-era="bc" aria-pressed="false" title="Before Christ (B.C.). The years the book prints.">B.C.</button></span>
@@ -760,7 +761,7 @@ const indexBody = `
 <div class="contents">
 ${VOLUMES.map((vol) => volumeBlock(vol)).join('\n')}
 </div>
-<p class="colophon">Scripture text: King James Version (1769). Transcriptions are a first pass from the scanned pages; question marks in the text flag uncertain readings.${PROOFING ? ' See the <a href="proofing.html">proofing list</a>.' : ''}</p>`;
+<p class="colophon">Scripture text: King James Version (1769). Transcriptions are a first pass from the scanned pages; question marks in the text flag uncertain readings.${PROOFING ? ' See the <a href="proofing.html">proofing list</a>.' : ''} <a href="https://ko-fi.com/lukeboyle">Support this work on Ko-fi</a>.</p>`;
 const indexHtml = layout({ title: SITE, body: indexBody, bodyClass: 'home', withToc: false });
 fs.writeFileSync(path.join(OUT, 'index.html'), indexHtml);
 // The Artifact host supplies the document skeleton for the main page, so emit a bare-body copy.

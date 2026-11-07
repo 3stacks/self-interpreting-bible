@@ -91,6 +91,14 @@ text. Each answer links to [Catechize](https://catechize.pages.dev), where a rea
 - CI runs the script before each build. If Catechize is not reachable, the build shows no list.
 - Catechize links back to each verse that is online here. It reads `backlinks.json`.
 
+## Public address
+
+The public address is `haddingtonbible.org`.
+
+Open `https://haddingtonbible.org`. The Pages project `self-interpreting-bible` serves that name.
+
+`www.haddingtonbible.org` has no DNS record. In that Pages project, add `www.haddingtonbible.org` as a custom domain. Cloudflare then creates the DNS record.
+
 ## Adding pages
 
 1. Extract the scans: `pymupdf` `page.get_images()[0]` → `scans/pdfNNN.png`.
