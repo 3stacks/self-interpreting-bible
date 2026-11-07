@@ -51,8 +51,9 @@ for (const f of files) {
   const text = fs.readFileSync(path.join(ROOT, 'transcription', f), 'utf8');
   const marks = [...text.matchAll(/<!--\s*(section|continued):\s*([a-z0-9-]+)\s*-->/g)];
   const vol = +(text.match(/<!--\s*volume:\s*(\d+)\s*-->/)?.[1] || (f.startsWith('v4/') ? 4 : 1));
-  const printedNum = text.match(/<!--\s*page:\s*\d+\s+printed:\s*(\d+)/)?.[1];
-  const printed = printedNum ? +printedNum : (vol === 1 ? pdf - 3 : null);
+  // Front matter of Volume IV is numbered in Roman numerals ("printed: vii"). Keep those as written.
+  const printedNum = text.match(/<!--\s*page:\s*\d+\s+printed:\s*(\d+|[ivxlc]+)\b/)?.[1];
+  const printed = printedNum ? (/^\d+$/.test(printedNum) ? +printedNum : printedNum) : (vol === 1 ? pdf - 3 : null);
   marks.forEach((mk, i) => {
     const [, kind, slug] = mk;
     const from = mk.index + mk[0].length;
@@ -73,8 +74,22 @@ for (const f of files) {
       s.plates.push({ pdf, caption: ill[1].replace(/\s+/g, ' ').trim() });
       s.md += `\n\n<div class="page-break" data-pdf="${pdf}" data-plate="1"></div>\n\n`;
     } else {
-      const body = markSource(raw, f, text.slice(0, from).split('\n').length);
-      s.md += `\n\n<div class="page-break" data-pdf="${pdf}"></div>\n\n` + body.replace(/^#\s+.+$/m, '');
+      let body = markSource(raw, f, text.slice(0, from).split('\n').length).replace(/^#\s+.+$/m, '');
+      const marker = `\n\n<div class="page-break" data-pdf="${pdf}"></div>\n\n`;
+      // A paragraph that runs over the page edge: the new page starts in lower case. Join it to the
+      // last paragraph of the page before (dropping a split-word hyphen), and set the page marker after it.
+      const lead = body.replace(/^(\s*<!--[\s\S]*?-->)*\s*/, '');
+      const prev = s.md.trimEnd().match(/^([\s\S]*\S)((?:\s*⟦[^⟧]+⟧)+)$/);
+      const lastLine = prev?.[1].split('\n').pop() ?? '';
+      if (kind === 'continued' && /^[a-z]/.test(lead) && prev && !/^(\||#|<|[-*]\s|\d+\.\s)/.test(lastLine.trim())) {
+        const cut = lead.search(/\n\s*\n/);
+        const first = cut < 0 ? lead : lead.slice(0, cut);
+        const rest = cut < 0 ? '' : lead.slice(cut);
+        const joined = /[A-Za-z]-$/.test(prev[1]) ? prev[1].slice(0, -1) + first : `${prev[1]} ${first}`;
+        s.md = joined + prev[2] + marker + rest;
+      } else {
+        s.md += marker + body;
+      }
     }
   });
 }
