@@ -1,0 +1,23 @@
+# EAS Build uploads the repository. This file takes the place of .gitignore for that upload.
+# The app needs lib/, tools/, data/ and transcription/ to write app/data. It does not need the scans or the website.
+node_modules/
+build/
+artifact-index.html
+.local/
+data/catechize-cited.json
+scans/
+site/
+functions/
+.github/
+app/node_modules/
+app/dist/
+app/.expo/
+app/data/
+app/ios/
+app/android/
+google-service-account.json
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision

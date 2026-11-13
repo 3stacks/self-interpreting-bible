@@ -3,3 +3,6 @@ build/
 artifact-index.html
 .local/
 data/catechize-cited.json
+
+# The key for Google Play submissions. Never commit it.
+google-service-account.json
