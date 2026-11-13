@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Haddington Bible",
+    "slug": "haddington-bible",
+    "scheme": "haddingtonbible",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#f5f6f1",
+    "ios": {
+      "bundleIdentifier": "com.lukeboyle.haddingtonbible",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.lukeboyle.haddingtonbible",
+      "adaptiveIcon": {
+        "backgroundColor": "#27407a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "lang": "en-GB"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#f5f6f1",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#15181c"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
