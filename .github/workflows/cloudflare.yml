@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PROJECT: self-interpreting-bible
+  PROJECT: haddingtonbible-org
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   # The account ID is not secret. It is in the dashboard URLs.
   CLOUDFLARE_ACCOUNT_ID: 66bbbf59d9ee8948f770553dfc0d5721
@@ -44,8 +44,5 @@ jobs:
       - run: npm --prefix site run lint
       - run: npm --prefix site run build
       - run: node tools/merge-site.mjs
-      # Create the Pages project on the first run. Later runs find it and go on.
-      - if: env.CLOUDFLARE_API_TOKEN != ''
-        run: npx -y wrangler@4 pages project create "$PROJECT" --production-branch=main || true
       - if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx -y wrangler@4 pages deploy build --project-name="$PROJECT" --branch=main --commit-dirty=true
