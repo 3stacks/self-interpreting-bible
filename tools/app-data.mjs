@@ -30,7 +30,7 @@ try {
   throw new Error('Install the root packages first: npm ci (at the repository root).');
 }
 
-export const FLAG = { i: 1, b: 2, sc: 4, key: 8, measure: 16, unsure: 32, fn: 64 };
+export const FLAG = { i: 1, b: 2, sc: 4, key: 8, measure: 16, unsure: 32, fn: 64, ver: 128 };
 
 // ---------- KJV ----------
 const kjvSrc = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/kjv-src.json'), 'utf8').replace(/^﻿/, ''));
@@ -75,6 +75,7 @@ function segments(html) {
       else if (tag === 'span' && cls.includes('sc')) flag = FLAG.sc;
       else if (tag === 'span' && cls.includes('conv')) flag = FLAG.measure;
       else if (tag === 'span' && cls.includes('unsure')) flag = FLAG.unsure;
+      else if (tag === 'span' && cls.includes('ver')) flag = FLAG.ver;
       else if (tag === 'a') ref = part.match(/data-ref="([^"]+)"/)?.[1] ?? null;
       stack.push([tag, flag, ref]);
       continue;
@@ -178,7 +179,8 @@ for (const code of order) {
       if (ch.notes.length) {
         noted.push(n);
         data.n = ch.notes.map((note) => {
-          const html = annotateMeasures(linker.linkHtml(inline(note.text)).replace(/\{([0-9*†‡§]{1,2})\}/g, '<sup class="fn">$1</sup>'));
+          const html = annotateMeasures(linker.linkHtml(inline(note.text)).replace(/\{([0-9*†‡§]{1,2})\}/g, '<sup class="fn">$1</sup>'))
+            .replace(/^(\[?)(Ver\.\s*[\d,\s\-–]+\.)/, '$1<span class="ver">$2</span>');
           const ver = note.text.match(/^\[?Ver\.\s*(\d+)/);
           const kind = note.heading ? 2 : /^\*\*Reflections\.\*\*/.test(note.text) ? 1 : 0;
           return [segments(html), ver ? +ver[1] : 0, kind];

@@ -42,6 +42,7 @@ export function Rich({ text, size, keys = true }: { text: RichText; size: number
     const bold = !!(flags & FLAG.b)
     const style: TextStyle = {
       ...(italic || bold ? { fontFamily: bold ? (italic ? serif.semiboldItalic : serif.semibold) : serif.italic } : {}),
+      ...(flags & FLAG.ver ? { fontFamily: serif.semibold, color: c.rubric } : {}),
       ...(flags & FLAG.sc ? { fontVariant: ['small-caps'], letterSpacing: 0.4 } : {}),
     }
     if (flags & FLAG.unsure) {

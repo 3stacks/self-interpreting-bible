@@ -8,7 +8,7 @@ import index from '../../data/index.json'
 export type Seg = string | [string, number] | [string, number, string]
 export type Rich = Seg[]
 
-export const FLAG = { i: 1, b: 2, sc: 4, key: 8, measure: 16, unsure: 32, fn: 64 }
+export const FLAG = { i: 1, b: 2, sc: 4, key: 8, measure: 16, unsure: 32, fn: 64, ver: 128 }
 
 /** [key, text, date] */
 export type MarginEntry = [string, Rich, string?]

@@ -1,0 +1,13 @@
+{
+  "bg": ["#2f4b8a", "#101b36"],
+  "accent": "#c9d4f2",
+  "ink": "#ffffff",
+  "sub": "#dfe5f5",
+  "motif": "rule",
+  "panels": [
+    { "title": "The Bible that\ninterprets itself", "body": "The King James text with the margin\nreferences of John Brown of Haddington.", "shot": "raw/chapter.png" },
+    { "title": "Scripture explains\nScripture", "body": "Tap a reference to read the passage\nin the King James Version.", "shot": "raw/reference.png" },
+    { "title": "Notes and\nreflections", "body": "Brown’s notes after the chapter,\nfor family and private reading.", "shot": "raw/notes.png" },
+    { "title": "Every book\nof the Bible", "body": "All the text is in the app.\nIt works with no connection.", "shot": "raw/contents.png" }
+  ]
+}
