@@ -56,6 +56,7 @@ export default function Settings() {
             value={prefs[o.key]}
             onValueChange={(v) => update({ [o.key]: v })}
             trackColor={{ true: c.accent }}
+            thumbColor="#ffffff"
             accessibilityLabel={o.label}
           />
         </View>

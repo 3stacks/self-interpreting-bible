@@ -23,6 +23,7 @@ export default function BookScreen() {
   const brown = new Set(book.brown)
   const intro = book.intro ?? []
   const shown = more ? intro : intro.slice(0, 1)
+  const long = intro.length > 1 || JSON.stringify(intro).length > 600
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={st.page} contentInsetAdjustmentBehavior="automatic">
       <Stack.Screen options={{ title: book.name }} />
@@ -33,11 +34,11 @@ export default function BookScreen() {
       {book.vol && <Text style={[st.source, { color: c.muted }]}>Volume {ROMAN[book.vol]} of the printed edition</Text>}
 
       {shown.map((p, i) => (
-        <Text key={i} style={[st.intro, { color: c.ink }]}>
+        <Text key={i} style={[st.intro, { color: c.ink }]} numberOfLines={more ? undefined : 5}>
           <Rich text={p} size={17} />
         </Text>
       ))}
-      {intro.length > 1 && (
+      {long && (
         <Text style={[st.more, { color: c.accent }]} accessibilityRole="button" onPress={() => setMore(!more)}>
           {more ? 'Show less' : 'Read the introduction'}
         </Text>
