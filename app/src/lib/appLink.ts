@@ -1,6 +1,6 @@
 // Links between the apps of the suite. A link to the website of a sibling app
 // opens that app when it is on the device. The same file is in each app:
-// Precentor, Hearers, Covenant Household and Haddington Bible.
+// Precentor, Hearers, Covenant Household, Haddington Bible and A Method for Prayer.
 
 /** The URL scheme of each app, by the host of its website. */
 const SCHEMES: Record<string, string> = {
@@ -8,6 +8,7 @@ const SCHEMES: Record<string, string> = {
   'precentor.app': 'precentor',
   'haddingtonbible.org': 'haddingtonbible',
   'covenanthousehold.app': 'covenanthousehold',
+  'methodforprayer.app': 'methodforprayer',
 }
 
 /**
@@ -19,6 +20,7 @@ const PATHS: Record<string, RegExp> = {
   precentor: /^(|psalm\/\d{3}b?)$/,
   haddingtonbible: /^(|[a-z0-9-]+-\d+)$/,
   covenanthousehold: /^$/,
+  methodforprayer: /^(|pray|occasions|book(\/[a-z-]+)?|head\/[a-z-]+-\d+)$/,
 }
 
 /**
@@ -50,4 +52,19 @@ export function appLink(url: string, self: string): string | undefined {
   path = path.replace(/^\/+|\/+$/g, '')
   if (!PATHS[scheme].test(path)) return undefined
   return `${scheme}://${path}${query}${hash}`
+}
+
+/** The name and the App Store page of each app that is on the App Store. */
+export const APPS: Record<string, { name: string; appStore?: string }> = {
+  hearers: { name: 'Hearers', appStore: 'https://apps.apple.com/app/id6834307677' },
+  precentor: { name: 'Precentor', appStore: 'https://apps.apple.com/app/id6834265380' },
+  haddingtonbible: { name: 'Haddington Bible' },
+  covenanthousehold: { name: 'Covenant Household', appStore: 'https://apps.apple.com/app/id6834362234' },
+  methodforprayer: { name: 'A Method for Prayer' },
+}
+
+/** The scheme of the sibling app that `url` points to, or undefined. Same rules as appLink. */
+export function siblingOf(url: string, self: string): string | undefined {
+  const app = appLink(url, self)
+  return app ? app.slice(0, app.indexOf(':')) : undefined
 }
