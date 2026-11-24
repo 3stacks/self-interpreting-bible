@@ -1,0 +1,142 @@
+{
+  "raw": "raw",
+  "statusBar": false,
+  "play": true,
+  "palette": {
+    "loud": "#ef4a3c",
+    "loudInk": "#fff7ec",
+    "mid": "#2f4b8a",
+    "dark": "#101b36",
+    "pop": "#ffd27d"
+  },
+  "cards": [
+    {
+      "shot": "chapter.png",
+      "tilt": 5,
+      "dx": -40,
+      "lines": [
+        {
+          "t": "Scripture",
+          "size": 140
+        },
+        {
+          "t": "explains",
+          "size": 300,
+          "key": true
+        },
+        {
+          "t": "Scripture",
+          "size": 140
+        }
+      ],
+      "pops": [
+        {
+          "crop": [
+            30,
+            750,
+            1260,
+            570
+          ],
+          "w": 1000,
+          "x": 280,
+          "y": 900,
+          "rot": -4
+        }
+      ],
+      "pills": []
+    },
+    {
+      "shot": "reference.png",
+      "tilt": -5,
+      "dx": 30,
+      "lines": [
+        {
+          "t": "Tap any",
+          "size": 170
+        },
+        {
+          "t": "reference",
+          "size": 255,
+          "key": true
+        }
+      ],
+      "pops": [
+        {
+          "crop": [
+            20,
+            2200,
+            1290,
+            628
+          ],
+          "w": 1060,
+          "x": 200,
+          "y": 1100,
+          "rot": 4
+        }
+      ],
+      "pills": []
+    },
+    {
+      "shot": "notes.png",
+      "tilt": 4,
+      "dx": -30,
+      "lines": [
+        {
+          "t": "Brown’s",
+          "size": 170
+        },
+        {
+          "t": "notes",
+          "size": 420,
+          "key": true
+        }
+      ],
+      "pops": [
+        {
+          "crop": [
+            30,
+            280,
+            1260,
+            363
+          ],
+          "w": 1040,
+          "x": 250,
+          "y": 640,
+          "rot": -3
+        }
+      ],
+      "pills": []
+    },
+    {
+      "shot": "contents.png",
+      "tilt": -5,
+      "dx": 40,
+      "lines": [
+        {
+          "t": "Works",
+          "size": 170
+        },
+        {
+          "t": "offline",
+          "size": 340,
+          "key": true
+        }
+      ],
+      "pops": [
+        {
+          "crop": [
+            64,
+            704,
+            1226,
+            232
+          ],
+          "w": 1060,
+          "x": 60,
+          "y": 860,
+          "rot": 4
+        }
+      ],
+      "pills": []
+    }
+  ]
+}

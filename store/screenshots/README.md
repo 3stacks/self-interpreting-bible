@@ -23,3 +23,19 @@ node store/screenshots/compose.cjs store/screenshots/config.json store/screensho
 `compose.cjs` needs the fonts Inter and Source Serif 4. `config.json` holds the colours, the
 headlines and the order of the screens. The colours are the blue of the cloth binding of the
 printed book.
+
+## The bold set
+
+`bold/` holds a second design, for a test against the first design. `compose-bold.cjs` draws it
+from the same raw screens.
+
+- The first card and the last card have a loud colour. One card in the middle is dark.
+- Each headline has two to four words. The key word is large and italic.
+- The phones tilt. Parts of each screen stand out of the phone at a larger size.
+
+`bold.json` holds the colours, the headlines and the crops. The script needs `sharp`, and
+`playwright` with its Chromium browser. The fonts are in `fonts/`.
+
+```bash
+NODE_PATH=<the node_modules with sharp and playwright> node compose-bold.cjs bold.json bold
+```
