@@ -13,6 +13,7 @@ brackets.
 | Support URL | https://github.com/3stacks/self-interpreting-bible/issues |
 | Marketing URL | https://haddingtonbible.org |
 | Privacy policy URL | https://haddingtonbible.org/privacy/ |
+| Terms of service URL | https://haddingtonbible.org/terms/ |
 | Copyright | 2026 Luke Boyle |
 | Price | Free |
 

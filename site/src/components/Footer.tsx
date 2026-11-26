@@ -17,6 +17,7 @@ export function Footer() {
           <a href={SEARCH_URL}>Search</a>
           <Link href="/john-brown-of-haddington/">John Brown of Haddington</Link>
           <Link href="/privacy/">Privacy</Link>
+          <Link href="/terms/">Terms</Link>
           <a href={REPO_URL}>GitHub</a>
           <a href={KOFI_URL}>Ko-fi</a>
         </nav>
